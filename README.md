@@ -1,0 +1,2 @@
+# LSAI
+Local Secure AI
