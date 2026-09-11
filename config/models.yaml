@@ -1,0 +1,124 @@
+version: "1.0"
+
+app:
+  name: "Sovereign On-Premise Agentic AI Workbench"
+  problem_statement_id: "26117"
+  target_environment: "Air-Gapped Confidential Industrial Deployment"
+
+models:
+  "deepseek-r1:32b":
+    name: "DeepSeek-R1-Distill-Qwen-32B"
+    category: "reasoning"
+    context_length: 8192
+    description: "High-level reasoning, complex SOP compliance, root-cause analysis, and multi-step planning"
+    recommended_quant: "Q3_K_M"
+    family: "deepseek"
+
+  "qwen3.8-27b":
+    name: "Qwen-3.8-27B"
+    category: "coding_math"
+    context_length: 8192
+    description: "Industrial engineering calculations, Python code generation, and complex math"
+    recommended_quant: "Q4_K_M"
+    family: "qwen"
+
+  "qwen2-vl:7b":
+    name: "Qwen2-VL-7B-Instruct"
+    category: "vision"
+    context_length: 4096
+    description: "P&ID diagrams, engineering drawings, instrument inspection, and multimodal analysis"
+    recommended_quant: "Q4_K_M"
+    family: "qwen_vl"
+
+  "docling":
+    name: "Docling-IBM"
+    category: "document_parser"
+    description: "Deep layout analysis, table extraction, and structured markdown conversion"
+    family: "docling"
+
+  "qwen-ocr":
+    name: "Qwen-OCR"
+    category: "ocr"
+    description: "High-accuracy OCR for scanned documents, handwriting, and low-resolution industrial reports"
+    family: "ocr"
+
+  "bge-small-en-v1.5":
+    name: "BAAI/bge-small-en-v1.5"
+    category: "embedding"
+    description: "Local sentence embeddings for Qdrant vector retrieval"
+    family: "embedding"
+
+profiles:
+  laptop_quantized:
+    name: "RTX 4050 6GB Laptop Profile"
+    description: "Optimized for RTX 4050 (6GB VRAM) + 16GB RAM with hybrid GPU layer offloading (ngl)"
+    target_hardware: "RTX 4050 (6GB VRAM) + 16GB System RAM"
+    vram_gb: 6
+    ram_gb: 16
+    default_quantization: "Q3_K_M"
+    gpu_layers_offload:
+      "deepseek-r1:32b": 22
+      "qwen3.8-27b": 24
+      "qwen2-vl:7b": 32
+    models:
+      reasoning: "deepseek-r1:32b"
+      coding: "qwen3.8-27b"
+      vision: "qwen2-vl:7b"
+
+  server_full:
+    name: "Enterprise Server Profile"
+    description: "Full unquantized / FP16 execution for 24GB+ / 48GB GPU servers"
+    target_hardware: "NVIDIA A100 / H100 / RTX 6000 Ada (24GB-48GB VRAM)"
+    vram_gb: 48
+    ram_gb: 64
+    default_quantization: "FP16"
+    gpu_layers_offload:
+      "deepseek-r1:32b": 99
+      "qwen3.8-27b": 99
+      "qwen2-vl:7b": 99
+    models:
+      reasoning: "deepseek-r1:32b"
+      coding: "qwen3.8-27b"
+      vision: "qwen2-vl:7b"
+
+  fast_fallback:
+    name: "High-Speed Demo / Presentation Fallback"
+    description: "Rapid 7B/8B models for instantaneous token streaming during fast pitches"
+    target_hardware: "Any modern laptop GPU / CPU"
+    vram_gb: 6
+    ram_gb: 16
+    default_quantization: "Q4_K_M"
+    gpu_layers_offload:
+      "deepseek-r1:7b": 99
+      "qwen2.5-coder:7b": 99
+      "qwen2-vl:2b": 99
+    models:
+      reasoning: "deepseek-r1:7b"
+      coding: "qwen2.5-coder:7b"
+      vision: "qwen2-vl:2b"
+
+routing_rules:
+  code_execution:
+    primary: "qwen3.8-27b"
+    fallback: "qwen2.5-coder:7b"
+    description: "Python scripts, data processing, tool execution, sandboxed code"
+  engineering_calculation:
+    primary: "qwen3.8-27b"
+    fallback: "qwen2.5-coder:7b"
+    description: "ASME standards, pipe thickness calculations, pressure vessel formulas, math"
+  deep_reasoning:
+    primary: "deepseek-r1:32b"
+    fallback: "deepseek-r1:7b"
+    description: "Root-cause investigation, multi-step problem solving, approval note planning"
+  sop_compliance:
+    primary: "deepseek-r1:32b"
+    fallback: "deepseek-r1:7b"
+    description: "Refinery safety procedures, approval workflows, PSU hierarchy compliance"
+  vision_pid_inspection:
+    primary: "qwen2-vl:7b"
+    fallback: "qwen2-vl:2b"
+    description: "P&ID schematics, engineering drawings, instrument tags, flow diagrams"
+  scanned_document_ocr:
+    primary: "docling"
+    secondary: "qwen-ocr"
+    description: "Scanned inspection PDF extraction, table reconstruction, handwritten notes"
