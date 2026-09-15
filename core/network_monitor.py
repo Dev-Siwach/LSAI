@@ -3,7 +3,7 @@ import collections
 import logging
 import socket
 import time
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from config.settings import get_settings
 

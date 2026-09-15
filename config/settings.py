@@ -56,10 +56,11 @@ class Settings:
         self.SANDBOX_TIMEOUT_SECONDS: int = int(os.getenv("SANDBOX_TIMEOUT_SECONDS", "30"))
         self.SANDBOX_MEMORY_LIMIT: str = os.getenv("SANDBOX_MEMORY_LIMIT", "512m")
         self.SANDBOX_CPU_LIMIT: float = float(os.getenv("SANDBOX_CPU_LIMIT", "1.0"))
+        self.SCRATCH_DIR: Path = Path(os.getenv("SCRATCH_DIR", str(self.BASE_DIR / "scratch")))
 
         # Local Vector DB & Embeddings (Embedded Qdrant, zero cloud)
         self.RAG_COLLECTION_NAME: str = os.getenv("RAG_COLLECTION_NAME", "sovereign_knowledge_base")
-        self.EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+        self.EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 
         # Upload limits
         self.MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50"))
@@ -76,6 +77,7 @@ class Settings:
             self.SAMPLES_DIR,
             self.STORAGE_DIR,
             self.QDRANT_DIR,
+            self.SCRATCH_DIR,
         ]:
             directory.mkdir(parents=True, exist_ok=True)
 
@@ -87,27 +89,29 @@ class Settings:
             "problem_statement_id": self.PROBLEM_STATEMENT_ID,
             "host": self.HOST,
             "port": self.PORT,
+            "debug": self.DEBUG,
             "active_profile": self.ACTIVE_PROFILE,
             "model_base_url": self.MODEL_BASE_URL,
+            "model_timeout_seconds": self.MODEL_TIMEOUT_SECONDS,
             "airgap_enforce": self.AIRGAP_ENFORCE,
             "airgap_allowed_hosts": self.AIRGAP_ALLOWED_HOSTS,
+            "airgap_log_buffer_size": self.AIRGAP_LOG_BUFFER_SIZE,
             "data_dir": str(self.DATA_DIR),
             "uploads_dir": str(self.UPLOADS_DIR),
             "deliverables_dir": str(self.DELIVERABLES_DIR),
+            "samples_dir": str(self.SAMPLES_DIR),
             "storage_dir": str(self.STORAGE_DIR),
             "qdrant_dir": str(self.QDRANT_DIR),
+            "scratch_dir": str(self.SCRATCH_DIR),
+            "sandbox_docker_image": self.SANDBOX_DOCKER_IMAGE,
+            "sandbox_timeout_seconds": self.SANDBOX_TIMEOUT_SECONDS,
+            "sandbox_memory_limit": self.SANDBOX_MEMORY_LIMIT,
+            "sandbox_cpu_limit": self.SANDBOX_CPU_LIMIT,
+            "rag_collection_name": self.RAG_COLLECTION_NAME,
+            "embedding_model": self.EMBEDDING_MODEL,
+            "max_upload_size_mb": self.MAX_UPLOAD_SIZE_MB,
+            "allowed_extensions": self.ALLOWED_EXTENSIONS,
         }
-
-
-# Try Pydantic Settings integration if library is installed in environment
-try:
-    from pydantic_settings import BaseSettings as PydanticBaseSettings
-    from pydantic import Field
-
-    class PydanticSettings(PydanticBaseSettings, Settings):  # type: ignore[misc]
-        model_config = {"extra": "ignore", "env_file": ".env", "env_file_encoding": "utf-8"}
-except ImportError:
-    pass
 
 
 @lru_cache(maxsize=1)
