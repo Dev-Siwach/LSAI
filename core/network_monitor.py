@@ -111,8 +111,12 @@ class NetworkMonitor:
         if not self.enforce:
             return True
             
-        # Allow UNIX domain sockets (paths rather than IP/hostname)
-        if host.startswith("/") or host.startswith("\\"):
+        # Allow UNIX domain sockets (filesystem paths or abstract namespace)
+        if host.startswith("/") or host.startswith("\\") or host.startswith("\x00"):
+            return True
+            
+        # Allow IPv4 loopback network (127.0.0.0/8)
+        if host.startswith("127."):
             return True
             
         return host in self.allowed_hosts or host == "0.0.0.0"
