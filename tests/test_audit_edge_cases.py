@@ -5,22 +5,17 @@ error handling, empty/malformed inputs, and resilience across all modules.
 """
 
 import asyncio
-import io
-import os
 import socket
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from config.settings import get_settings, get_model_for_task, get_profile_config
-from core.network_monitor import NetworkMonitor, SecurityException, network_monitor
+from core.network_monitor import NetworkMonitor, SecurityException
 from core.model_manager import ModelManager, ModelError
-from core.orchestrator import Orchestrator, TaskStatus, TaskPlan, PlanStep
+from core.orchestrator import Orchestrator, TaskStatus
 from tools.file_manager import FileManager
 from tools.spreadsheet import SpreadsheetTool
 from tools.sandbox import Sandbox
-from tools.rag_engine import RagEngine
-from tools.doc_parser import DocParser
 from tools.deliverable_gen import DeliverableGenerator
 from fastapi.testclient import TestClient
 from api.main import app
@@ -62,23 +57,25 @@ class TestPhase2EdgeCases:
     def test_airgap_blocks_external_and_records_audit(self):
         nm = NetworkMonitor()
         nm.start()
-        initial_blocked = nm.stats["blocked_requests"]
+        try:
+            initial_blocked = nm.stats["blocked_requests"]
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            with pytest.raises(SecurityException):
+                s.connect(("1.1.1.1", 80))
+            s.close()
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        with pytest.raises(SecurityException):
-            s.connect(("1.1.1.1", 80))
-        s.close()
-
-        assert nm.stats["blocked_requests"] == initial_blocked + 1
-        last_event = nm.events[-1]
-        assert last_event["destination"] == "1.1.1.1"
-        assert last_event["status"] == "BLOCKED"
+            assert nm.stats["blocked_requests"] == initial_blocked + 1
+            last_event = nm.events[-1]
+            assert last_event["destination"] == "1.1.1.1"
+            assert last_event["status"] == "BLOCKED"
+        finally:
+            nm.stop()
 
     @pytest.mark.asyncio
     async def test_model_manager_unreachable_endpoint_raises_model_error(self):
         mgr = ModelManager()
         # Point to an unreachable port
-        mgr.base_url = "http://127.0.0.1:59999/v1"
+        mgr.base_url = "http://127.0.0.1:59999/v1/"
         mgr._client = None  # Reset client
 
         with pytest.raises(ModelError):
@@ -89,18 +86,17 @@ class TestPhase2EdgeCases:
 class TestPhase3EdgeCases:
     """Audit Phase 3: Tools, storage, sandbox, and deliverable generators."""
 
-    def test_file_manager_path_traversal_prefix_attack(self, tmp_path):
+    def test_file_manager_path_traversal_prefix_attack(self):
         fm = FileManager()
         settings = get_settings()
 
-        # Attempt to access a hypothetical directory named uploads_fake
         fake_path = str(settings.UPLOADS_DIR) + "_fake/secret.txt"
         assert fm._is_path_allowed(fake_path) is False
 
         with pytest.raises(PermissionError):
             fm.read_file(fake_path)
 
-    def test_spreadsheet_tool_invalid_coordinates(self, tmp_path):
+    def test_spreadsheet_tool_invalid_coordinates(self):
         fm = FileManager()
         sheet = SpreadsheetTool(fm)
 
@@ -126,6 +122,7 @@ class TestPhase3EdgeCases:
         path2 = gen._generate_filepath("note", ".docx")
         assert path1.suffix == ".docx"
         assert path2.suffix == ".docx"
+        assert path1 != path2
 
 
 class TestPhase4EdgeCases:
@@ -150,7 +147,6 @@ class TestPhase4EdgeCases:
     @pytest.mark.asyncio
     async def test_orchestrator_cancellation_aborts_steps(self):
         orch = Orchestrator()
-        # Mock slow execution
         mock_sandbox = MagicMock()
         mock_sandbox.execute_code.return_value = {"success": True, "stdout": "", "stderr": "", "exit_code": 0}
         orch._sandbox = mock_sandbox
@@ -165,13 +161,25 @@ class TestPhase4EdgeCases:
 
     def test_api_path_traversal_encoded_dots_and_slashes(self):
         client = TestClient(app)
-        # Encoded ../../etc/shadow
         resp = client.get("/api/deliverables/download/%2e%2e%2f%2e%2e%2fetc%2fshadow")
         assert resp.status_code in (400, 403, 404)
 
     def test_api_security_exception_handler_returns_403(self):
+        """Verify that SecurityException triggers the 403 JSON exception handler."""
+        from fastapi import APIRouter
+        test_router = APIRouter()
+
+        @test_router.get("/api/test-security-trigger")
+        def trigger_sec_violation():
+            raise SecurityException("Air-gap violation: blocked connection to 8.8.8.8:53")
+
+        app.include_router(test_router)
+
         client = TestClient(app)
-        # Verify /api/network/verify returns 200 with airgap verified
-        resp = client.post("/api/network/verify")
-        assert resp.status_code == 200
-        assert resp.json()["airgap_verified"] is True
+        resp = client.get("/api/test-security-trigger")
+        assert resp.status_code == 403
+        data = resp.json()
+        assert data["error"] == "AIRGAP_VIOLATION_INTERCEPTED"
+        assert data["airgap_enforced"] is True
+        assert data["sovereign_status"] == "BLOCKED"
+        assert "Air-gap violation" in data["message"]

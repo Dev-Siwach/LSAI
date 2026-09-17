@@ -8,7 +8,6 @@ and agent task dispatch, status, and cancellation.
 import io
 import time
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -46,6 +45,10 @@ class TestSystemEndpoints:
             assert "airgap" in data
             assert data["airgap"]["sovereign_proof"] == "ZERO_EXTERNAL_EGRESS"
             assert "directories" in data
+
+    def test_demo_endpoint(self, client):
+        response = client.get("/demo")
+        assert response.status_code == 200
 
 
 class TestNetworkRoutes:
@@ -160,6 +163,11 @@ class TestRagRoutes:
         assert data["success"] is True
         assert "sop_402_test.txt" in data["filename"]
 
+        # Clean up created file
+        saved_path = data.get("saved_path")
+        if saved_path and Path(saved_path).exists():
+            Path(saved_path).unlink()
+
     def test_rag_search_query(self, client):
         response = client.post(
             "/api/rag/search",
@@ -200,6 +208,11 @@ class TestAgentRoutes:
     def test_agent_task_not_found(self, client):
         response = client.get("/api/agent/task/nonexistent-task-id-1234")
         assert response.status_code == 404
+
+    def test_agent_tasks_list(self, client):
+        response = client.get("/api/agent/tasks?limit=10")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
 
     def test_agent_cancel_task(self, client):
         # Create a task

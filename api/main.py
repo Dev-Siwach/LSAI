@@ -40,10 +40,14 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown sequence
-    network_monitor.stop()
-    await model_manager.close()
-    logger.info("Application shutdown complete: sockets restored, connection pools closed.")
+    # Shutdown sequence with safe exception handling
+    try:
+        network_monitor.stop()
+    except Exception as e:
+        logger.error(f"Error stopping network monitor: {e}")
+    finally:
+        await model_manager.close()
+        logger.info("Application shutdown complete: sockets restored, connection pools closed.")
 
 
 def create_app() -> FastAPI:
@@ -60,10 +64,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS Middleware (permits local dashboards and test workbench)
+    # CORS Middleware: compliant origin regex for localhost / 127.0.0.1 with credentials
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -91,18 +95,18 @@ def create_app() -> FastAPI:
 
     # Static Directory & Demo Workbench Mount
     static_dir = settings.BASE_DIR / "static"
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    static_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-        @app.get("/demo", include_in_schema=False)
-        async def serve_demo():
-            index_file = static_dir / "index.html"
-            if index_file.exists():
-                return FileResponse(str(index_file))
-            return JSONResponse(
-                {"status": "Workbench static frontend not yet seeded. Use /api endpoints."},
-                status_code=200,
-            )
+    @app.get("/demo", include_in_schema=False)
+    async def serve_demo():
+        index_file = static_dir / "index.html"
+        if index_file.exists():
+            return FileResponse(str(index_file))
+        return JSONResponse(
+            {"status": "Workbench static frontend not yet seeded. Use /api endpoints."},
+            status_code=200,
+        )
 
     # System Health & Root Endpoints
     @app.get("/", tags=["System"])

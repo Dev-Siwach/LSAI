@@ -47,7 +47,9 @@ def mock_tools():
 
     mock_deliverable = MagicMock()
     mock_deliverable.generate_docx_approval_note.return_value = "/tmp/mock_approval_note.docx"
+    mock_deliverable.generate_excel_calculation_sheet.return_value = "/tmp/mock_calc_sheet.xlsx"
     mock_deliverable.generate_xlsx_calculation_sheet.return_value = "/tmp/mock_calc_sheet.xlsx"
+    mock_deliverable.generate_pptx_briefing.return_value = "/tmp/mock_briefing.pptx"
 
     mock_file_mgr = MagicMock()
     mock_file_mgr.list_files.return_value = []
@@ -295,3 +297,27 @@ class TestSessionContextAndSSE:
         # Check session history was updated
         history = orchestrator.get_session_history("test-session")
         assert len(history) == 2  # user + assistant
+
+    @pytest.mark.asyncio
+    async def test_real_sse_event_streaming(self, orchestrator):
+        task_id = "test-sse-task"
+        orchestrator.tasks[task_id] = MagicMock(status=TaskStatus.PLANNING, cancelled=False, to_dict=lambda: {"status": "PLANNING"})
+
+        received_events = []
+
+        async def collect_events():
+            async for ev in orchestrator.stream_events(task_id):
+                received_events.append(ev)
+                if ev.get("event") == "task_completed":
+                    break
+
+        collector = asyncio.create_task(collect_events())
+        await asyncio.sleep(0.05)
+
+        await orchestrator.emit_event(task_id, "step_started", {"step": 1})
+        await orchestrator.emit_event(task_id, "task_completed", {"status": "COMPLETED"})
+
+        await asyncio.wait_for(collector, timeout=2.0)
+        assert len(received_events) == 2
+        assert received_events[0]["event"] == "step_started"
+        assert received_events[1]["event"] == "task_completed"

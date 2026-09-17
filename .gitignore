@@ -14,7 +14,6 @@ lib/
 lib64/
 parts/
 sdist/
-var/
 wheels/
 share/python-wheels/
 *.egg-info/
@@ -33,6 +32,8 @@ data/uploads/*
 !data/uploads/.gitkeep
 data/deliverables/*
 !data/deliverables/.gitkeep
+data/samples/*
+!data/samples/.gitkeep
 
 # Environment variables & secrets
 .env
@@ -46,12 +47,19 @@ data/deliverables/*
 *.swo
 *~
 .DS_Store
+Thumbs.db
+ehthumbs.db
 
-# Testing & Coverage
+# Testing & Coverage & Linters
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
+.mypy_cache/
+.ruff_cache/
 
-# Scratch & Logs
+# Scratch & Logs & Backups
 *.log
+*.bak
+*.tmp
 scratch/

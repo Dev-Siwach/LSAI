@@ -78,6 +78,7 @@ async def upload_document(
     # Sanitize and save file to uploads directory
     target_id = doc_id or f"doc_{uuid.uuid4().hex[:8]}"
     clean_filename = f"{target_id}_{Path(filename).name}"
+    settings.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     save_path = settings.UPLOADS_DIR / clean_filename
 
     content_bytes = await file.read()
@@ -97,11 +98,14 @@ async def upload_document(
     if ext == ".pdf":
         parse_res = parser.parse_pdf(str(save_path))
         extracted_text = parse_res.get("content", "")
-    else:
+    elif ext in (".txt", ".md", ".csv", ".json"):
         try:
             extracted_text = content_bytes.decode("utf-8", errors="replace")
         except Exception:
             extracted_text = ""
+    else:
+        # Structured binary format (e.g. .xlsx, .docx, .png)
+        extracted_text = f"Attached industrial document: {filename} (type: {ext})"
 
     chunks_count = 0
     engine = get_rag_engine()

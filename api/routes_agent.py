@@ -67,9 +67,10 @@ async def stream_agent_events(task_id: str):
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     async def event_generator():
-        # If task already completed before stream connected, emit completion
-        if state["status"] in ("COMPLETED", "FAILED", "CANCELLED"):
-            yield f"event: {state['status'].lower()}\ndata: {json.dumps(state)}\n\n"
+        curr = orchestrator.get_task_state(task_id)
+        if curr and curr["status"] in ("COMPLETED", "FAILED", "CANCELLED"):
+            event_name = f"task_{curr['status'].lower()}"
+            yield f"event: {event_name}\ndata: {json.dumps(curr)}\n\n"
             return
 
         async for event in orchestrator.stream_events(task_id):

@@ -31,7 +31,7 @@ async def get_network_stats() -> Dict[str, Any]:
         "allowed_requests": network_monitor.stats["allowed_requests"],
         "bytes_transferred": network_monitor.stats["bytes_transferred"],
         "recent_event_count": len(network_monitor.events),
-        "sovereign_status": "100% AIR-GAPPED (0 EXTERNAL CALLS)" if network_monitor.stats["blocked_requests"] == 0 or network_monitor.enforce else "AUDIT MODE",
+        "sovereign_status": "100% AIR-GAPPED (0 EXTERNAL CALLS)" if network_monitor.enforce else "AUDIT MODE",
     }
 
 
@@ -45,7 +45,7 @@ async def get_recent_network_events(limit: int = 100) -> List[Dict[str, Any]]:
 @router.get("/stream")
 async def stream_network_events():
     """SSE endpoint broadcasting real-time socket intercept events."""
-    q = network_monitor.subscribe()
+    q = await network_monitor.subscribe()
 
     async def event_generator():
         try:
@@ -78,22 +78,22 @@ async def verify_airgap_enforcement() -> Dict[str, Any]:
     blocked = False
     exception_caught = None
 
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(1.0)
     try:
-        # Create a socket and attempt to connect to external DNS server
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1.0)
         s.connect((target_host, target_port))
-        s.close()
     except SecurityException as se:
         blocked = True
         exception_caught = str(se)
     except Exception as e:
-        # Other exception (e.g. if SecurityException was wrapped)
         if "air-gap" in str(e).lower() or "violation" in str(e).lower():
             blocked = True
-            exception_caught = str(e)
-        else:
-            exception_caught = str(e)
+        exception_caught = str(e)
+    finally:
+        try:
+            s.close()
+        except Exception:
+            pass
 
     return {
         "airgap_verified": blocked,
