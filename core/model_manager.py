@@ -4,6 +4,7 @@ Provides health checks, completion generation (blocking and streaming),
 latency tracking, and token statistics — all over localhost only.
 """
 
+import json
 import time
 import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -127,7 +128,15 @@ class ModelManager:
             self.stats["total_prompt_tokens"] += usage.get("prompt_tokens", 0)
             self.stats["total_completion_tokens"] += usage.get("completion_tokens", 0)
 
-            content = data["choices"][0]["message"]["content"]
+            choices = data.get("choices")
+            if not choices:
+                self.stats["failed_requests"] += 1
+                raise ModelError(
+                    f"Model '{model_id}' returned empty choices in response",
+                    status_code=response.status_code,
+                )
+
+            content = choices[0].get("message", {}).get("content", "")
 
             return {
                 "content": content,
@@ -185,7 +194,6 @@ class ModelManager:
                     if data_str.strip() == "[DONE]":
                         break
 
-                    import json
                     try:
                         chunk = json.loads(data_str)
                     except json.JSONDecodeError:

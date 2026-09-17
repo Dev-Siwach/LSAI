@@ -15,6 +15,30 @@ import yaml
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _parse_int_env(name: str, default: str, *, min_val: int | None = None) -> int:
+    """Parse an integer environment variable with optional minimum validation."""
+    raw = os.getenv(name, default)
+    try:
+        val = int(raw)
+    except ValueError:
+        raise ValueError(f"Environment variable {name}={raw!r} is not a valid integer")
+    if min_val is not None and val < min_val:
+        raise ValueError(f"Environment variable {name}={val} must be >= {min_val}")
+    return val
+
+
+def _parse_float_env(name: str, default: str, *, min_val: float | None = None) -> float:
+    """Parse a float environment variable with optional minimum validation."""
+    raw = os.getenv(name, default)
+    try:
+        val = float(raw)
+    except ValueError:
+        raise ValueError(f"Environment variable {name}={raw!r} is not a valid number")
+    if min_val is not None and val < min_val:
+        raise ValueError(f"Environment variable {name}={val} must be >= {min_val}")
+    return val
+
+
 class Settings:
     """Application settings with environment variable override support."""
 
@@ -37,25 +61,25 @@ class Settings:
 
         # Network & Server
         self.HOST: str = os.getenv("HOST", "127.0.0.1")
-        self.PORT: int = int(os.getenv("PORT", "8000"))
+        self.PORT: int = _parse_int_env("PORT", "8000", min_val=1)
         self.DEBUG: bool = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
         # Model Server (OpenAI-compatible local server, e.g. Ollama or llama-server)
         self.MODEL_BASE_URL: str = os.getenv("MODEL_BASE_URL", "http://127.0.0.1:11434/v1")
-        self.MODEL_TIMEOUT_SECONDS: float = float(os.getenv("MODEL_TIMEOUT_SECONDS", "120.0"))
+        self.MODEL_TIMEOUT_SECONDS: float = _parse_float_env("MODEL_TIMEOUT_SECONDS", "120.0", min_val=1.0)
         self.ACTIVE_PROFILE: str = os.getenv("ACTIVE_PROFILE", "laptop_quantized")
 
         # Air-Gap Enforcement & Network Monitor
         self.AIRGAP_ENFORCE: bool = os.getenv("AIRGAP_ENFORCE", "true").lower() in ("true", "1", "yes")
         allowed_hosts_str = os.getenv("AIRGAP_ALLOWED_HOSTS", "127.0.0.1,localhost,::1")
         self.AIRGAP_ALLOWED_HOSTS: List[str] = [h.strip() for h in allowed_hosts_str.split(",") if h.strip()]
-        self.AIRGAP_LOG_BUFFER_SIZE: int = int(os.getenv("AIRGAP_LOG_BUFFER_SIZE", "500"))
+        self.AIRGAP_LOG_BUFFER_SIZE: int = _parse_int_env("AIRGAP_LOG_BUFFER_SIZE", "500", min_val=1)
 
         # Sandbox Execution Engine
         self.SANDBOX_DOCKER_IMAGE: str = os.getenv("SANDBOX_DOCKER_IMAGE", "python:3.11-slim")
-        self.SANDBOX_TIMEOUT_SECONDS: int = int(os.getenv("SANDBOX_TIMEOUT_SECONDS", "30"))
+        self.SANDBOX_TIMEOUT_SECONDS: int = _parse_int_env("SANDBOX_TIMEOUT_SECONDS", "30", min_val=1)
         self.SANDBOX_MEMORY_LIMIT: str = os.getenv("SANDBOX_MEMORY_LIMIT", "512m")
-        self.SANDBOX_CPU_LIMIT: float = float(os.getenv("SANDBOX_CPU_LIMIT", "1.0"))
+        self.SANDBOX_CPU_LIMIT: float = _parse_float_env("SANDBOX_CPU_LIMIT", "1.0", min_val=0.1)
         self.SCRATCH_DIR: Path = Path(os.getenv("SCRATCH_DIR", str(self.BASE_DIR / "scratch")))
 
         # Local Vector DB & Embeddings (Embedded Qdrant, zero cloud)
@@ -63,7 +87,7 @@ class Settings:
         self.EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 
         # Upload limits
-        self.MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50"))
+        self.MAX_UPLOAD_SIZE_MB: int = _parse_int_env("MAX_UPLOAD_SIZE_MB", "50", min_val=1)
         self.ALLOWED_EXTENSIONS: List[str] = [
             ".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".csv", ".txt", ".docx", ".pptx"
         ]
@@ -123,23 +147,34 @@ def get_settings() -> Settings:
 
 
 @lru_cache(maxsize=1)
-def load_models_registry(config_path: Optional[Path] = None) -> dict[str, Any]:
+def load_models_registry() -> dict[str, Any]:
     """Load model registry and routing configuration from YAML.
 
-    Args:
-        config_path: Optional path to models.yaml. Defaults to path from settings.
+    Always reads from the path specified in settings (MODELS_CONFIG_PATH).
+    Cached after first successful load; call .cache_clear() to reload.
 
     Returns:
         Dict containing model specifications, profiles, and routing rules.
     """
     settings = get_settings()
-    path = config_path or settings.MODELS_CONFIG_PATH
+    path = settings.MODELS_CONFIG_PATH
     if not path.exists():
         raise FileNotFoundError(f"Model configuration file not found at: {path}")
 
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
-    return data or {}
+
+    if not data:
+        raise ValueError(f"Model configuration file is empty or invalid: {path}")
+
+    # Basic structure validation
+    for required_key in ("models", "profiles"):
+        if required_key not in data:
+            raise ValueError(
+                f"Model configuration missing required key '{required_key}' in {path}"
+            )
+
+    return data
 
 
 def get_profile_config(profile_name: Optional[str] = None) -> dict[str, Any]:
