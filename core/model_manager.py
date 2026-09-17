@@ -4,9 +4,10 @@ Provides health checks, completion generation (blocking and streaming),
 latency tracking, and token statistics — all over localhost only.
 """
 
+import asyncio
 import json
-import time
 import logging
+import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
@@ -29,7 +30,9 @@ class ModelManager:
 
     def __init__(self) -> None:
         self.settings = get_settings()
-        self.base_url = self.settings.MODEL_BASE_URL
+        # Ensure trailing slash so relative paths resolve within /v1/
+        raw_url = self.settings.MODEL_BASE_URL.rstrip("/")
+        self.base_url = raw_url + "/"
         self.timeout = self.settings.MODEL_TIMEOUT_SECONDS
 
         self.stats = {
@@ -39,16 +42,23 @@ class ModelManager:
             "total_completion_tokens": 0,
         }
 
-        # Reusable async HTTP client — created lazily on first use
         self._client: Optional[httpx.AsyncClient] = None
+        self._lock: Optional[asyncio.Lock] = None
+
+    def _get_lock(self) -> asyncio.Lock:
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Return the shared async HTTP client, creating it if needed."""
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(
-                base_url=self.base_url,
-                timeout=httpx.Timeout(self.timeout, connect=10.0),
-            )
+            async with self._get_lock():
+                if self._client is None or self._client.is_closed:
+                    self._client = httpx.AsyncClient(
+                        base_url=self.base_url,
+                        timeout=httpx.Timeout(self.timeout, connect=10.0),
+                    )
         return self._client
 
     async def close(self) -> None:
@@ -61,23 +71,23 @@ class ModelManager:
         """Check if the local model server is up."""
         try:
             client = await self._get_client()
-            response = await client.get("/models", timeout=5.0)
+            response = await client.get("models", timeout=5.0)
             return response.status_code == 200
         except Exception as e:
-            logger.error(f"Model server health check failed: {e}")
+            logger.debug(f"Model server health check failed: {e}")
             return False
 
     async def list_available_models(self) -> List[str]:
         """Fetch list of available models from the local server."""
         try:
             client = await self._get_client()
-            response = await client.get("/models", timeout=5.0)
+            response = await client.get("models", timeout=5.0)
             if response.status_code == 200:
-                data = response.json()
-                return [model.get("id", "") for model in data.get("data", [])]
+                data = response.json() or {}
+                return [model.get("id", "") for model in data.get("data", []) if model.get("id")]
             return []
         except Exception as e:
-            logger.error(f"Failed to list models: {e}")
+            logger.debug(f"Failed to list models: {e}")
             return []
 
     async def generate_completion(
@@ -105,7 +115,7 @@ class ModelManager:
 
         try:
             client = await self._get_client()
-            response = await client.post("/chat/completions", json=payload)
+            response = await client.post("chat/completions", json=payload)
 
             if response.status_code != 200:
                 self.stats["failed_requests"] += 1
@@ -113,43 +123,57 @@ class ModelManager:
                 if response.status_code == 404:
                     error_detail = (
                         f"Model '{model_id}' might not be downloaded or available locally. "
-                        f"Try: ollama pull {model_id}"
+                        f"Try running 'ollama pull {model_id}'. Original error: {response.text}"
                     )
-                logger.error(f"Model server returned status {response.status_code}: {error_detail}")
                 raise ModelError(
-                    f"Model server error ({response.status_code}): {error_detail}",
+                    f"Model server returned status {response.status_code}: {error_detail}",
                     status_code=response.status_code,
                 )
 
-            data = response.json()
-            latency = time.time() - start_time
+            data = response.json() or {}
+            duration_s = time.time() - start_time
 
-            usage = data.get("usage", {})
-            self.stats["total_prompt_tokens"] += usage.get("prompt_tokens", 0)
-            self.stats["total_completion_tokens"] += usage.get("completion_tokens", 0)
+            usage = data.get("usage") or {}
+            prompt_tokens = usage.get("prompt_tokens", 0) or 0
+            completion_tokens = usage.get("completion_tokens", 0) or 0
 
-            choices = data.get("choices")
+            self.stats["total_prompt_tokens"] += prompt_tokens
+            self.stats["total_completion_tokens"] += completion_tokens
+
+            choices = data.get("choices") or []
             if not choices:
                 self.stats["failed_requests"] += 1
-                raise ModelError(
-                    f"Model '{model_id}' returned empty choices in response",
-                    status_code=response.status_code,
-                )
+                raise ModelError("Model server returned no choices in response")
 
-            content = choices[0].get("message", {}).get("content", "")
+            choice = choices[0] or {}
+            content = (choice.get("message") or {}).get("content", "")
+
+            tokens_per_sec = (
+                round(completion_tokens / duration_s, 1) if duration_s > 0 else 0.0
+            )
 
             return {
                 "content": content,
-                "latency": latency,
-                "usage": usage,
-                "model": model_id,
+                "model": data.get("model", model_id),
+                "duration_seconds": round(duration_s, 2),
+                "latency": duration_s,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "tokens_per_second": tokens_per_sec,
             }
+
         except ModelError:
             raise
         except httpx.RequestError as e:
             self.stats["failed_requests"] += 1
             logger.error(f"Request to model server failed: {e}")
-            raise ModelError(f"Failed to communicate with local model server: {e}")
+            raise ModelError(
+                f"Failed to connect to local model server at {self.base_url}: {e}"
+            )
+        except Exception as e:
+            self.stats["failed_requests"] += 1
+            logger.error(f"Unexpected error in model completion: {e}")
+            raise ModelError(f"Unexpected error communicating with model: {e}")
 
     async def generate_completion_stream(
         self,
@@ -158,12 +182,10 @@ class ModelManager:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> AsyncIterator[str]:
-        """Stream completion tokens from local OpenAI-compatible endpoint.
-
-        Yields individual content delta strings as they arrive.
+        """Stream completion tokens from local model server using SSE.
 
         Raises:
-            ModelError: If the server returns an error or is unreachable.
+            ModelError: If connection fails or server returns non-200.
         """
         self.stats["total_requests"] += 1
 
@@ -178,7 +200,7 @@ class ModelManager:
 
         try:
             client = await self._get_client()
-            async with client.stream("POST", "/chat/completions", json=payload) as response:
+            async with client.stream("POST", "chat/completions", json=payload) as response:
                 if response.status_code != 200:
                     self.stats["failed_requests"] += 1
                     body = await response.aread()
@@ -195,13 +217,18 @@ class ModelManager:
                         break
 
                     try:
-                        chunk = json.loads(data_str)
+                        chunk = json.loads(data_str) or {}
                     except json.JSONDecodeError:
                         continue
 
-                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    choices = chunk.get("choices") or []
+                    if not choices:
+                        continue
+
+                    delta = choices[0].get("delta") or {}
                     content = delta.get("content")
                     if content:
+                        self.stats["total_completion_tokens"] += 1
                         yield content
 
         except ModelError:

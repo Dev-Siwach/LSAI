@@ -1,4 +1,5 @@
 import os
+import uuid
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
@@ -19,10 +20,11 @@ class DeliverableGenerator:
         self.deliverables_dir.mkdir(parents=True, exist_ok=True)
 
     def _generate_filepath(self, prefix: str, ext: str) -> Path:
-        """Generate a unique filepath for a new deliverable."""
+        """Generate a guaranteed unique filepath for a new deliverable."""
         self.deliverables_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{prefix}_{timestamp}{ext}"
+        unique_id = uuid.uuid4().hex[:6]
+        filename = f"{prefix}_{timestamp}_{unique_id}{ext}"
         return self.deliverables_dir / filename
 
     def generate_docx_approval_note(self, data: Dict[str, Any]) -> str:
@@ -192,6 +194,9 @@ class DeliverableGenerator:
         wb.close()
         return str(filepath)
 
+    # Method alias for interoperability with orchestrator and API
+    generate_xlsx_calculation_sheet = generate_excel_calculation_sheet
+
     def generate_pptx_briefing(self, data: Dict[str, Any]) -> str:
         """Generate .pptx summary slides for executive briefing.
 
@@ -243,3 +248,7 @@ class DeliverableGenerator:
         filepath = self._generate_filepath("Briefing", ".pptx")
         prs.save(str(filepath))
         return str(filepath)
+
+    # Method alias
+    generate_pptx_summary_presentation = generate_pptx_briefing
+

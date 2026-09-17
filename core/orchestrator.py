@@ -139,6 +139,7 @@ class Orchestrator:
         self.tasks: Dict[str, TaskState] = {}
         self.sessions: Dict[str, List[Dict[str, str]]] = {}
         self.subscribers: Dict[str, Set[asyncio.Queue]] = {}
+        self._background_tasks: Set[asyncio.Task] = set()
 
     # --------------------------------------------------------------------------
     # Tool Accessors (Lazy Loading)
@@ -228,7 +229,9 @@ class Orchestrator:
         queues = self.subscribers.get(task_id, set())
         for q in list(queues):
             try:
-                await q.put(event_payload)
+                q.put_nowait(event_payload)
+            except asyncio.QueueFull:
+                logger.debug(f"Task {task_id} subscriber queue full, dropping event")
             except Exception as e:
                 logger.debug(f"Failed to push event to queue: {e}")
 
@@ -247,6 +250,16 @@ class Orchestrator:
 
     async def stream_events(self, task_id: str) -> AsyncIterator[Dict[str, Any]]:
         """Async generator yielding SSE events for task_id."""
+        state = self.tasks.get(task_id)
+        if state and state.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            yield {
+                "event": f"task_{state.status.value.lower()}",
+                "task_id": task_id,
+                "timestamp": time.time(),
+                "data": state.to_dict(),
+            }
+            return
+
         q = self.subscribe(task_id)
         try:
             while True:
@@ -279,10 +292,10 @@ class Orchestrator:
         has_image = any(f.lower().endswith((".png", ".jpg", ".jpeg", ".bmp")) for f in files)
         has_pdf = any(f.lower().endswith(".pdf") for f in files)
 
-        if has_image or any(k in p_lower for k in ["p&id", "pid", "drawing", "schematic", "piping and instrumentation"]):
+        if has_image or bool(re.search(r"\b(p&id|pid)\b", p_lower)) or any(k in p_lower for k in ["drawing", "schematic", "piping and instrumentation"]):
             return "vision_pid_inspection"
 
-        if has_pdf or any(k in p_lower for k in ["scanned", "ocr", "inspection report", "ultrasonic", "ndt report"]):
+        if any(k in p_lower for k in ["scanned", "ocr", "inspection report", "ultrasonic", "ndt report"]) or (has_pdf and not any(k in p_lower for k in ["asme", "calculate", "thickness", "code", "python"])):
             return "scanned_document_ocr"
 
         if any(k in p_lower for k in [
@@ -730,10 +743,14 @@ class Orchestrator:
         if not ("only xlsx" in p_lower or "only excel" in p_lower or "only code" in p_lower):
             try:
                 # Extract observations from step results
-                findings_text = "\n".join([
+                successful_findings = [
                     f"• [{res['name']}]: {str(res.get('result', {}))[:180]}"
                     for res in step_results if res.get("status") == "SUCCESS"
-                ]) or "All technical checks and air-gapped analyses executed within tolerance thresholds."
+                ]
+                if successful_findings:
+                    findings_text = "\n".join(successful_findings)
+                else:
+                    findings_text = "Technical execution completed with execution errors in tool steps. Please review step logs."
 
                 docx_data = {
                     "ref_number": ref_no,
@@ -778,7 +795,7 @@ class Orchestrator:
                         ["Actual Wall Thickness", "t_act", 0.3650, "inches", "Schedule 40", "PASS (COMPLIANT)"],
                     ],
                 }
-                xlsx_path = self.deliverable_gen.generate_xlsx_calculation_sheet(xlsx_data)
+                xlsx_path = self.deliverable_gen.generate_excel_calculation_sheet(xlsx_data)
                 deliverables.append({
                     "type": "xlsx",
                     "filename": Path(xlsx_path).name,
@@ -793,6 +810,33 @@ class Orchestrator:
                 )
             except Exception as e:
                 logger.error(f"Xlsx generation failed: {e}")
+
+        # 3. PowerPoint (.pptx) Presentation if requested
+        if any(k in p_lower for k in ["pptx", "powerpoint", "presentation", "slide"]):
+            try:
+                pptx_data = {
+                    "slides": [
+                        {
+                            "title": "Sovereign Industrial AI Workbench",
+                            "content": f"Executive Briefing: {plan.task_type.replace('_', ' ').title()}\nReference: {ref_no}",
+                        },
+                        {
+                            "title": "Technical Findings & Recommendations",
+                            "content": findings_text.split("\n"),
+                        },
+                    ]
+                }
+                pptx_path = self.deliverable_gen.generate_pptx_briefing(pptx_data)
+                deliverables.append({
+                    "type": "pptx",
+                    "filename": Path(pptx_path).name,
+                    "filepath": str(pptx_path),
+                    "title": "Executive Presentation Slides",
+                    "download_url": f"/api/deliverables/download/{Path(pptx_path).name}",
+                })
+                await self.emit_event(task_id, "deliverable_created", deliverables[-1])
+            except Exception as e:
+                logger.error(f"Pptx generation failed: {e}")
 
         # Construct comprehensive markdown synthesis report
         synthesis_md = (
@@ -847,8 +891,12 @@ class Orchestrator:
         # Record user prompt in session history
         self.append_session_message(sid, "user", prompt)
 
-        # Launch async execution pipeline
-        asyncio.create_task(self._execute_pipeline(task_id, prompt, sid, task_type, file_paths, profile))
+        # Launch async execution pipeline with task retention to prevent GC
+        bg_task = asyncio.create_task(
+            self._execute_pipeline(task_id, prompt, sid, task_type, file_paths, profile)
+        )
+        self._background_tasks.add(bg_task)
+        bg_task.add_done_callback(self._background_tasks.discard)
 
         return task_id
 
@@ -910,8 +958,9 @@ class Orchestrator:
             state.deliverables = synth_res["deliverables"]
             state.synthesis = synth_res["synthesis"]
 
-            # Task Completion
-            state.status = TaskStatus.COMPLETED
+            # Task Completion status: COMPLETED only if all steps succeeded, else FAILED
+            all_succeeded = all(s.get("status") == "SUCCESS" for s in step_results) if step_results else True
+            state.status = TaskStatus.COMPLETED if all_succeeded else TaskStatus.FAILED
             state.completed_at = time.time()
             total_duration_ms = round((state.completed_at - start_time) * 1000, 2)
 
@@ -920,10 +969,10 @@ class Orchestrator:
 
             await self.emit_event(
                 task_id,
-                "task_completed",
+                "task_completed" if all_succeeded else "task_failed",
                 {
                     "task_id": task_id,
-                    "status": "COMPLETED",
+                    "status": state.status.value,
                     "total_duration_ms": total_duration_ms,
                     "deliverables": state.deliverables,
                     "synthesis": state.synthesis,
