@@ -63,11 +63,63 @@ class DocParser:
                 "content": "",
             }
 
+        # Attempt 3: Standard library PDF text stream extractor (zero-dependency fallback)
+        try:
+            raw_bytes = path.read_bytes()
+            extracted = self._extract_raw_pdf_text(raw_bytes)
+            if extracted and extracted.strip():
+                return {
+                    "success": True,
+                    "content": extracted.strip(),
+                    "metadata": {
+                        "source": str(path),
+                        "parser": "native_stream_fallback",
+                    },
+                }
+        except Exception:
+            pass
+
         return {
             "success": False,
             "error": "No PDF parser available. Install docling or pypdf.",
             "content": "",
         }
+
+    def _extract_raw_pdf_text(self, raw_bytes: bytes) -> str:
+        """Extract text from uncompressed or FlateDecode PDF streams using stdlib only."""
+        import re
+        import zlib
+
+        extracted_lines = []
+
+        # Find all stream ... endstream blocks
+        stream_matches = re.findall(rb"stream[\r\n]+(.*?)[\r\n]+endstream", raw_bytes, re.DOTALL)
+        for s in stream_matches:
+            data = s
+            # Try decompressing if flate compressed
+            try:
+                data = zlib.decompress(s)
+            except Exception:
+                pass
+
+            decoded = data.decode("latin-1", errors="ignore")
+            # Match Tj and TJ text operations
+            tj_matches = re.findall(r"\((.*?)\)\s*Tj", decoded)
+            for m in tj_matches:
+                cleaned = m.replace(r"\(", "(").replace(r"\)", ")").replace(r"\\", "\\")
+                if cleaned.strip():
+                    extracted_lines.append(cleaned)
+
+        if not extracted_lines:
+            # Fallback direct scan on whole file
+            decoded = raw_bytes.decode("latin-1", errors="ignore")
+            tj_matches = re.findall(r"\((.*?)\)\s*Tj", decoded)
+            for m in tj_matches:
+                cleaned = m.replace(r"\(", "(").replace(r"\)", ")").replace(r"\\", "\\")
+                if cleaned.strip():
+                    extracted_lines.append(cleaned)
+
+        return "\n".join(extracted_lines)
 
     def prepare_vision_image(self, filepath: str, max_size: Tuple[int, int] = (1024, 1024)) -> str:
         """Prepare an image (e.g. P&ID) for Qwen2-VL by optimizing size/format."""

@@ -1,0 +1,83 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+5 0 obj
+<< /Length 3059 >>
+stream
+BT
+/F1 10 Tf
+36 750 Td
+13 TL
+(BHARAT REFINERIES & PETROCHEMICALS CORPORATION) Tj
+T* (CENTRAL INSPECTION & NON-DESTRUCTIVE TESTING DIVISION) Tj
+T* (============================================================) Tj
+T* (ANNUAL COMPREHENSIVE ULTRASONIC INSPECTION REPORT: 2026) Tj
+T* (Document Ref: BRPC/INSP/AVDU-02/UTG-402     Date: 15-JAN-2026) Tj
+T* (Refinery Unit: Atmospheric Vacuum Distillation Unit \(AVDU-02\)) Tj
+T* (Equipment: Fractionator Column C-101 Overhead Vapor Circuit) Tj
+T* (Piping Line Identifier: 10-HC-402-CS300 \(NPS 10 Carbon Steel\)) Tj
+T* (Design Standard: ASME B31.3 / API 570      Class: 300#) Tj
+T* (Design Pressure: 258 psig \(18.2 kg/cm2g\)   Design Temp: 320 F) Tj
+T* (------------------------------------------------------------) Tj
+T* (EXECUTIVE SUMMARY & ULTRASONIC GAUGING FINDINGS:) Tj
+T* (1. Nominal As-Built Wall Thickness: 9.53 mm \(0.375 in, Sch 40\)) Tj
+T* (2. Specified Minimum Corrosion Allowance \(CA\): 2.00 mm) Tj
+T* (3. Calculated ASME B31.3 Minimum Wall Thickness \(t_min\): 7.20 mm) Tj
+T* (4. Retirement Wall Thickness Limit \(t_ret\): 6.80 mm) Tj
+T* () Tj
+T* (ULTRASONIC THICKNESS GAUGING \(UTG\) RESULTS AT CRITICAL TMLs:) Tj
+T* (+----------+-------------------------+-------------+---------+) Tj
+T* (| TML No.  | Inspection Location     | Thick \(mm\)  | Status  |) Tj
+T* (+----------+-------------------------+-------------+---------+) Tj
+T* (| TML-01   | Column C-101 Top Nozzle | 8.92 mm     | NORMAL  |) Tj
+T* (| TML-02   | Overhead Elbow E-01     | 8.10 mm     | NORMAL  |) Tj
+T* (| TML-03   | Safety Valve PSV-402 In | 7.95 mm     | MONITOR |) Tj
+T* (| TML-04   | Elbow E-04 Weld W-12    | 7.15 mm     | DEFICIENT) Tj
+T* (| TML-05   | Accumulator V-104 Inlet | 8.45 mm     | NORMAL  |) Tj
+T* (+----------+-------------------------+-------------+---------+) Tj
+T* () Tj
+T* (CRITICAL DEFECT ANALYSIS \(TML-04 / ELBOW E-04\):) Tj
+T* (- Measured Wall Thickness: 7.15 mm \(BELOW MINIMUM DESIGN 7.20 mm\)) Tj
+T* (- Historical Thickness \(2024 Inspection\): 8.05 mm) Tj
+T* (- Metal Loss over 24 Months: 0.90 mm \(Corrosion Rate: 0.45 mm/yr\)) Tj
+T* (- Accelerated localized pitting corrosion observed near weld seam W-12) Tj
+T* (  caused by ammonium chloride salt deposition and wet H2S condensation.) Tj
+T* () Tj
+T* (MANDATORY RECOMMENDATIONS UNDER REFINERY SOP-REF-402:) Tj
+T* (1. Issue Immediate Alert Notice Level 1 for Line 10-HC-402.) Tj
+T* (2. Prepare formal PSU Approval Note for Chief General Manager \(CGM\).) Tj
+T* (3. Perform ASME Sec IX qualified structural weld overlay within 30 days.) Tj
+T* (4. Recalibrate and verify set pressure on Safety Relief Valve PSV-402.) Tj
+T* (5. Conduct follow-up ultrasonic testing in 90 days to verify integrity.) Tj
+T* (------------------------------------------------------------) Tj
+T* (Inspected By: Er. R. K. Sharma \(NDT Level III - UT/VT/MT\)) Tj
+T* (Verified By:  Er. S. Sengupta \(Chief Inspection Engineer\)) Tj
+T* (Classification: STRICTLY CONFIDENTIAL - AIR-GAP ON-PREMISE ONLY) Tj
+T* (============================================================) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000315 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3426
+%%EOF

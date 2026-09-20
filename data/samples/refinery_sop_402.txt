@@ -1,0 +1,113 @@
+================================================================================
+BHARAT REFINERIES & PETROCHEMICALS CORPORATION (A GOVT. OF INDIA ENTERPRISE)
+CENTRAL TECHNICAL DIRECTORATE — SAFETY & PIPING INTEGRITY DIVISION
+DOCUMENT NO: SOP-REF-402-REV4                               CLASSIFICATION: CONFIDENTIAL
+================================================================================
+
+STANDARD OPERATING PROCEDURE:
+MONITORING, CORROSION ASSESSMENT, AND APPROVAL HIERARCHY FOR
+HIGH-PRESSURE SAFETY RELIEF VALVES (PSVs) AND RECTIFICATION PROTOCOLS
+
+--------------------------------------------------------------------------------
+1. PURPOSE AND APPLICABILITY
+--------------------------------------------------------------------------------
+1.1 This Standard Operating Procedure defines the mandatory engineering inspection,
+    ultrasonic thickness verification, corrosion rate monitoring, and administrative
+    approval hierarchy for high-pressure safety relief valves (PSVs) and associated
+    overhead hydrocarbon lines operating within Central Refinery Units.
+1.2 Applicable to Atmospheric and Vacuum Distillation Units (AVDU), Fluidized Catalytic
+    Cracking Units (FCCU), and Continuous Catalytic Reforming (CCR) blocks.
+1.3 In accordance with Air-Gap Sovereign Compliance Directive 2026/SEC-04, no inspection
+    telemetry, ultrasonic gauging data, or process flow diagrams shall be transmitted
+    outside refinery premises or uploaded to public cloud infrastructure.
+
+--------------------------------------------------------------------------------
+2. ENGINEERING CODES & STATUTORY STANDARDS
+--------------------------------------------------------------------------------
+All evaluations and calculations must strictly adhere to:
+- ASME Boiler and Pressure Vessel Code (BPVC), Section VIII, Division 1
+- ASME B31.3: Process Piping Design and Allowable Stress Criteria
+- API 520: Sizing, Selection, and Installation of Pressure-Relieving Devices
+- API 526: Flanged Steel Pressure-Relief Valves
+- API 570: Piping Inspection Code: In-service Inspection, Rating, Repair
+- OISD-STD-132: Safety Relief and Depressurizing Systems (Oil Industry Safety Directorate)
+
+--------------------------------------------------------------------------------
+3. HIGH-PRESSURE SAFETY RELIEF VALVE (PSV) SCHEDULE
+--------------------------------------------------------------------------------
+The following critical safety devices are monitored under this protocol:
+
++----------+-----------------------+------------+----------------+-------------+
+| Valve ID | Associated Equipment  | Line Tag   | Set Press(psi) | Orifice Des |
++----------+-----------------------+------------+----------------+-------------+
+| PSV-401  | Pre-Flash Column V-10 | 08-CR-401  | 220.0 psig     | 4L6 (API)   |
+| PSV-402  | Column C-101 Overhead | 10-HC-402  | 258.0 psig     | 6Q8 (API)   |
+| PSV-403  | Reboiler E-102 Inlet  | 06-RB-403  | 312.0 psig     | 3K4 (API)   |
+| PSV-404  | Accumulator Boot V-104| 04-AC-404  | 185.0 psig     | 2J3 (API)   |
++----------+-----------------------+------------+----------------+-------------+
+
+--------------------------------------------------------------------------------
+4. PROCESS PIPING WALL THICKNESS & CORROSION THRESHOLDS
+--------------------------------------------------------------------------------
+For Carbon Steel Line 10-HC-402 (ASTM A106 Grade B, NPS 10, Design Class 300):
+- Nominal As-Built Wall Thickness:        9.53 mm (0.375 in / Schedule 40)
+- Specified Corrosion Allowance (CA):     2.00 mm
+- Calculated Minimum Design Thickness:    7.20 mm (t_min under ASME B31.3 at 258 psig)
+- Mandatory Retirement Thickness (t_ret):  6.80 mm
+
+Corrosion Rate Classifications:
+- Normal Corrosion Rate:                  < 0.15 mm/year (Standard inspection cycle: 24 mos)
+- Accelerated Corrosion:                  0.15 mm - 0.35 mm/year (Cycle reduced to 12 mos)
+- Severe / Critical Thinning:             > 0.35 mm/year (Mandatory intervention within 30 days)
+
+--------------------------------------------------------------------------------
+5. ASME B31.3 MINIMUM THICKNESS FORMULA
+--------------------------------------------------------------------------------
+The minimum required pipe wall thickness (t_m) to resist internal design pressure
+shall be calculated as:
+                     P * D
+    t_m = ----------------------------- + c
+           2 * (S * E * W + P * Y)
+
+Where:
+    P = Internal design pressure (psig)
+    D = Outside diameter of pipe (inches)
+    S = Basic allowable stress of material at design temperature (psi)
+    E = Longitudinal weld quality factor (1.00 for seamless)
+    W = Weld joint strength reduction factor (1.00 for normal temperatures)
+    Y = Material coefficient (0.40 for ferritic steels under 900 deg F)
+    c = Sum of mechanical allowances + corrosion allowance (inches)
+
+--------------------------------------------------------------------------------
+6. MANDATORY RECTIFICATION & ACTION PROTOCOLS
+--------------------------------------------------------------------------------
+6.1 If measured ultrasonic wall thickness (t_actual) satisfies:
+    t_actual >= 7.50 mm:
+    -> Continue normal operation; log NDT report in local sovereign database.
+6.2 If 7.20 mm <= t_actual < 7.50 mm:
+    -> Issue Alert Level 2; mandate repeat ultrasonic gauging within 90 days.
+    -> Verify that operating set pressure on PSV-402 is properly calibrated.
+6.3 If t_actual < 7.20 mm (Deficient Wall Thickness):
+    -> Issue Emergency Action Notice Level 1 immediately.
+    -> Mandatory rectification within 30 days:
+       Option A: Full spool piece replacement during planned unit decoking.
+       Option B: ASME Section IX qualified structural weld overlay (pre-approved clamp).
+       Option C: Immediate pressure derating certified by Technical Directorate.
+
+--------------------------------------------------------------------------------
+7. ADMINISTRATIVE APPROVAL HIERARCHY
+--------------------------------------------------------------------------------
+Official Approval Notes generated for inspection findings must be processed through
+the following administrative sequence:
+
+1. Field Inspection Officer (NDT Level II / III):
+   - Conducts ultrasonic testing, visual examination, and drafts initial observations.
+2. Executive Engineer (Inspection & Maintenance):
+   - Verifies ASME B31.3 code calculations and checks SOP-REF-402 compliance.
+3. Chief General Manager / Executive Director (Refinery Operations):
+   - Final statutory approval authority for derating, repair authorizations, or
+     procurement of emergency replacement spools.
+
+================================================================================
+END OF STANDARD OPERATING PROCEDURE — SOP-REF-402-REV4
+================================================================================

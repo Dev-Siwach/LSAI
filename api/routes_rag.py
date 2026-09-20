@@ -182,3 +182,46 @@ async def get_rag_info() -> Dict[str, Any]:
         "storage_path": str(settings.QDRANT_DIR),
         "status": "ONLINE" if engine is not None else "STANDBY",
     }
+
+
+@router.get("/samples")
+async def list_sample_documents() -> List[Dict[str, Any]]:
+    """List pre-loaded industrial demo samples available in the air-gap workspace."""
+    settings = get_settings()
+    samples_dir = settings.SAMPLES_DIR
+    samples_dir.mkdir(parents=True, exist_ok=True)
+
+    metadata_map = {
+        "refinery_sop_402.txt": {
+            "title": "Refinery Safety Directive SOP-REF-402",
+            "category": "sop_compliance",
+            "description": "Standard Operating Procedure for high-pressure PSVs and piping wall thickness criteria.",
+        },
+        "inspection_report_sample.pdf": {
+            "title": "AVDU-02 Ultrasonic Inspection Report",
+            "category": "inspection_report",
+            "description": "Scanned NDT report detailing UTG wall thinning findings on Line 10-HC-402-CS.",
+        },
+        "pid_drawing_sample.png": {
+            "title": "Fractionator Column C-101 P&ID Schematic",
+            "category": "pid_drawing",
+            "description": "Engineering drawing showing distillation tower, PSV-402 relief valve, and instruments.",
+        },
+    }
+
+    samples = []
+    for item in sorted(samples_dir.iterdir(), key=lambda p: p.name):
+        if item.is_file() and not item.name.startswith("."):
+            meta = metadata_map.get(item.name, {
+                "title": item.name,
+                "category": "sample_document",
+                "description": f"Industrial sample asset: {item.name}",
+            })
+            samples.append({
+                "filename": item.name,
+                "filepath": str(item),
+                "size_bytes": item.stat().st_size,
+                "extension": item.suffix.lower(),
+                **meta,
+            })
+    return samples

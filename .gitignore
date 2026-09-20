@@ -34,6 +34,9 @@ data/deliverables/*
 !data/deliverables/.gitkeep
 data/samples/*
 !data/samples/.gitkeep
+!data/samples/refinery_sop_402.txt
+!data/samples/pid_drawing_sample.png
+!data/samples/inspection_report_sample.pdf
 
 # Environment variables & secrets
 .env
