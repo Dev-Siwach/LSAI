@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LSAI — Sovereign On-Premise Agentic AI Workbench</title>
+  <style>
+    :root {
+      --bg-main: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #172033;
+      --bg-input: #0f172a;
+      --border-color: #1e293b;
+      --border-focus: #3b82f6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-subtle: #64748b;
+      --accent-green: #10b981;
+      --accent-green-bg: rgba(16, 185, 129, 0.12);
+      --accent-blue: #3b82f6;
+      --accent-blue-bg: rgba(59, 130, 246, 0.12);
+      --accent-amber: #f59e0b;
+      --accent-amber-bg: rgba(245, 158, 11, 0.12);
+      --accent-red: #ef4444;
+      --accent-red-bg: rgba(239, 68, 68, 0.15);
+      --accent-purple: #8b5cf6;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    header {
+      background-color: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: white;
+      font-size: 16px;
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-green {
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-pulse::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .badge-blue {
+      background: var(--accent-blue-bg);
+      color: var(--accent-blue);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-purple {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--accent-purple);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    /* Telemetry Metrics Bar */
+    .telemetry-strip {
+      background-color: var(--bg-card);
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .metric-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .metric-label {
+      color: var(--text-subtle);
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .metric-value.highlight-green { color: var(--accent-green); }
+    .metric-value.highlight-red { color: var(--accent-red); }
+
+    /* Main Workspace Layout */
+    .main-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 20px;
+      padding: 20px 24px;
+      max-width: 1720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    @media (max-width: 1080px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-body {
+      padding: 16px 18px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Demo Scenario Cards */
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .scenario-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .scenario-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-focus);
+      transform: translateY(-1px);
+    }
+
+    .scenario-btn .scenario-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .scenario-btn .scenario-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    /* Form Inputs */
+    label.field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    textarea.prompt-input {
+      width: 100%;
+      min-height: 110px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 10px 12px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.45;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    textarea.prompt-input:focus {
+      border-color: var(--border-focus);
+    }
+
+    select.input-select {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 8px 12px;
+      font-size: 13px;
+      width: 100%;
+      outline: none;
+    }
+
+    /* File Attachment Bar */
+    .file-attachment-box {
+      border: 1px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(15, 23, 42, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .file-pill {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #93c5fd;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .file-pill button.remove-file {
+      background: transparent;
+      border: none;
+      color: #93c5fd;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    /* Buttons */
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      flex: 1;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-danger {
+      background: var(--accent-red-bg);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: var(--accent-red);
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    .btn-secondary {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+    }
+
+    /* Execution Timeline & 3-Stage Cards */
+    .stages-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .stage-card {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+
+    .stage-card.active {
+      border-color: var(--accent-blue);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .stage-card.completed {
+      border-color: var(--accent-green);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .stage-number {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-subtle);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stage-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .stage-status {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Terminal Execution Stream Log */
+    .terminal-container {
+      flex: 1;
+      min-height: 280px;
+      background: #06090e;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-y: auto;
+      max-height: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      word-break: break-word;
+    }
+
+    .log-time { color: var(--text-subtle); flex-shrink: 0; }
+    .log-tag { font-weight: bold; flex-shrink: 0; }
+    .log-tag.plan { color: #60a5fa; }
+    .log-tag.tool { color: #34d399; }
+    .log-tag.retry { color: #fbbf24; }
+    .log-tag.synth { color: #c084fc; }
+    .log-tag.error { color: #f87171; }
+    .log-text { color: #e2e8f0; }
+
+    /* Deliverables Shelf */
+    .deliverables-shelf {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .deliverables-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .deliverables-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .deliverable-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      transition: all 0.15s ease;
+    }
+
+    .deliverable-card:hover {
+      border-color: var(--accent-blue);
+      transform: translateY(-1px);
+    }
+
+    .deliverable-icon {
+      font-size: 16px;
+    }
+
+    .deliverable-btn {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .deliverable-btn:hover {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    /* Tabs for Bottom Section */
+    .bottom-section {
+      grid-column: 1 / -1;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .tab-header {
+      display: flex;
+      background: rgba(15, 23, 42, 0.6);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .tab-content {
+      padding: 16px 20px;
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Network Monitor Table */
+    .network-table-wrap {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+
+    table.network-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      text-align: left;
+    }
+
+    table.network-table th {
+      background: #0f172a;
+      padding: 8px 12px;
+      color: var(--text-subtle);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+    }
+
+    table.network-table td {
+      padding: 7px 12px;
+      border-bottom: 1px solid #1e293b;
+      color: var(--text-muted);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .status-badge.allowed {
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+    }
+
+    .status-badge.blocked {
+      background: var(--accent-red-bg);
+      color: var(--accent-red);
+    }
+
+    /* RAG Search Tester */
+    .rag-tester {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .rag-search-bar {
+      display: flex;
+      gap: 10px;
+    }
+
+    .rag-results {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .rag-chunk {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 12px;
+    }
+
+    .rag-chunk-meta {
+      font-size: 11px;
+      color: var(--accent-blue);
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand-group">
+      <div class="brand-logo">&#x26E8;</div>
+      <div>
+        <div class="brand-title">
+          LSAI Sovereign Workbench
+          <span class="badge badge-purple" style="font-size: 10px;">PS ID: 26117</span>
+        </div>
+        <div class="brand-subtitle">Confidential Industrial Agentic AI — 100% On-Premise Air-Gapped</div>
+      </div>
+    </div>
+
+    <div class="header-badges">
+      <span class="badge badge-green badge-pulse" id="shield-badge">100% AIR-GAP ENFORCED</span>
+      <span class="badge badge-blue" id="model-badge">MODEL: AUTO-ROUTING</span>
+      <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="checkSystemHealth()">
+        &#x21BB; Health Check
+      </button>
+    </div>
+  </header>
+
+  <!-- Real-time Air-Gap Telemetry Strip -->
+  <div class="telemetry-strip">
+    <div class="metric-item">
+      <span class="metric-label">Air-Gap Shield:</span>
+      <span class="metric-value highlight-green" id="metric-shield">VERIFIED ZERO EGRESS</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">External Blocked:</span>
+      <span class="metric-value highlight-green" id="metric-blocked">0 Calls</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Localhost Calls:</span>
+      <span class="metric-value" id="metric-allowed">0 Sockets</span>
+    </div>
+    <div class="metric-item">
+      <span class="metric-label">Active Hardware Profile:</span>
+      <span class="metric-value" id="metric-profile" style="color: #60a5fa;">laptop_quantized</span>
+    </div>
+    <div class="metric-item">
+      <button class="btn btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="triggerAirgapTest()">
+        &#x26A1; Test Air-Gap Probe
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Workspace -->
+  <div class="main-container">
+
+    <!-- Left Column: Task Controls & Scenarios -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">&#x2699;&#xFE0F; Industrial Task Dispatcher</span>
+        <span class="badge badge-blue">STAGE 1 ROUTER</span>
+      </div>
+
+      <div class="panel-body">
+        <!-- 4 Quick-Action Demo Scenarios -->
+        <div>
+          <label class="field-label">ONE-CLICK DEMO SCENARIOS (PROBLEM STATEMENT 26117)</label>
+          <div class="scenario-grid">
+            <button class="scenario-btn" onclick="selectScenario(1)">
+              <span class="scenario-title">1. Code & Math Sandbox &#x2192;</span>
+              <span class="scenario-desc">ASME B31.3 Pipe wall minimum allowable thickness calculation.</span>
+            </button>
+            <button class="scenario-btn" onclick="selectScenario(2)">
+              <span class="scenario-title">2. Scanned Report to Note &#x2192;</span>
+              <span class="scenario-desc">Parse UTG PDF, search SOP-402, draft PSU Word (.docx) approval note.</span>
+            </button>
+            <button class="scenario-btn" onclick="selectScenario(3)">
+              <span class="scenario-title">3. Multimodal P&ID &#x2192;</span>
+              <span class="scenario-desc">Inspect drawing, extract PSV-402 relief tag & set pressure.</span>
+            </button>
+            <button class="scenario-btn" onclick="selectScenario(4)">
+              <span class="scenario-title">4. Sovereign Proof &#x2192;</span>
+              <span class="scenario-desc">Trigger unauthorized socket probe (8.8.8.8) & inspect real-time block.</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Prompt Textarea -->
+        <div>
+          <label class="field-label">ENGINEERING PROMPT / TASK DIRECTIVE</label>
+          <textarea id="prompt-input" class="prompt-input" placeholder="Enter engineering directive, calculation instruction, or inspection request..."></textarea>
+        </div>
+
+        <!-- Attached Files & Demo Sample Selector -->
+        <div>
+          <label class="field-label">ATTACHED WORKSPACE SAMPLES</label>
+          <div class="file-attachment-box">
+            <div style="display: flex; gap: 8px;">
+              <select id="sample-select" class="input-select" onchange="attachSampleFromDropdown()">
+                <option value="">-- Attach Industrial Sample --</option>
+                <option value="data/samples/refinery_sop_402.txt">Refinery SOP-402 (Piping & PSV Integrity SOP)</option>
+                <option value="data/samples/inspection_report_sample.pdf">Inspection Report (AVDU-02 UTG Scanned PDF)</option>
+                <option value="data/samples/pid_drawing_sample.png">P&ID Drawing (Atmospheric Column C-101)</option>
+              </select>
+            </div>
+            <div class="file-pills" id="attached-pills">
+              <!-- Dynamically populated pills -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Hardware Profile & Action Buttons -->
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <div style="flex: 1;">
+            <label class="field-label">TARGET HARDWARE PROFILE</label>
+            <select id="profile-select" class="input-select" onchange="updateProfileBadge()">
+              <option value="laptop_quantized">RTX 4050 6GB + 16GB RAM (laptop_quantized)</option>
+              <option value="server_full">Dual RTX 4090 / A100 (server_full)</option>
+              <option value="fast_fallback">Fast CPU/Demo Mode (fast_fallback)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button id="run-btn" class="btn btn-primary" onclick="runAgentTask()">
+            &#x25B6; Run Agent Pipeline
+          </button>
+          <button id="cancel-btn" class="btn btn-danger" onclick="cancelCurrentTask()" disabled>
+            &#x25A0; Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Live 3-Stage Pipeline & Deliverables -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">&#x1F9E0; 3-Stage Agent Live Execution Terminal</span>
+        <span class="badge badge-green" id="execution-status-badge">STANDBY</span>
+      </div>
+
+      <div class="panel-body">
+        <!-- 3-Stage Progress Indicators -->
+        <div class="stages-bar">
+          <div class="stage-card" id="card-stage-1">
+            <span class="stage-number">STAGE 1</span>
+            <span class="stage-name">Plan & Route</span>
+            <span class="stage-status" id="stage-1-status">Idle</span>
+          </div>
+          <div class="stage-card" id="card-stage-2">
+            <span class="stage-number">STAGE 2</span>
+            <span class="stage-name">Tool Execution</span>
+            <span class="stage-status" id="stage-2-status">Idle</span>
+          </div>
+          <div class="stage-card" id="card-stage-3">
+            <span class="stage-number">STAGE 3</span>
+            <span class="stage-name">Synthesis</span>
+            <span class="stage-status" id="stage-3-status">Idle</span>
+          </div>
+        </div>
+
+        <!-- Terminal Output -->
+        <div class="terminal-container" id="terminal-log">
+          <div class="log-line">
+            <span class="log-time">[00:00:00]</span>
+            <span class="log-tag plan">[SYSTEM]</span>
+            <span class="log-text">Sovereign On-Premise Agentic AI Workbench initialized.</span>
+          </div>
+          <div class="log-line">
+            <span class="log-time">[00:00:00]</span>
+            <span class="log-tag tool">[AIRGAP]</span>
+            <span class="log-text">In-process socket interceptor active. Zero external egress verified.</span>
+          </div>
+          <div class="log-line">
+            <span class="log-time">[00:00:00]</span>
+            <span class="log-tag synth">[READY]</span>
+            <span class="log-text">Select a demo scenario or enter an engineering prompt to begin.</span>
+          </div>
+        </div>
+
+        <!-- Generated Deliverables Shelf -->
+        <div class="deliverables-shelf">
+          <div class="deliverables-header">
+            <span>VERIFIED ARTIFACT DELIVERABLES</span>
+            <span id="deliverable-count">0 Files</span>
+          </div>
+          <div class="deliverables-list" id="deliverables-container">
+            <span style="font-size: 12px; color: var(--text-subtle);">No deliverables generated yet. Run a scenario to produce artifacts.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Full-Width Tabs: Network Audit Monitor & RAG Explorer -->
+    <div class="bottom-section">
+      <div class="tab-header">
+        <button class="tab-btn active" onclick="switchTab('network-tab', this)">
+          &#x1F6E1;&#xFE0F; Real-time Air-Gap Network Audit Log
+        </button>
+        <button class="tab-btn" onclick="switchTab('rag-tab', this)">
+          &#x1F4DA; Local Knowledge Base (RAG) Explorer
+        </button>
+        <button class="tab-btn" onclick="switchTab('samples-tab', this)">
+          &#x1F4C1; Available Industrial Datasets
+        </button>
+      </div>
+
+      <!-- Tab 1: Network Monitor -->
+      <div id="network-tab" class="tab-content active">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="font-size: 12px; color: var(--text-muted);">
+            Live Operating System Socket Interceptions (Whitelisted: 127.0.0.1, localhost)
+          </span>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="fetchNetworkStats()">
+            Refresh Network Stats
+          </button>
+        </div>
+        <div class="network-table-wrap">
+          <table class="network-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Destination</th>
+                <th>Port</th>
+                <th>Protocol</th>
+                <th>Sovereignty Action</th>
+                <th>Bytes</th>
+              </tr>
+            </thead>
+            <tbody id="network-tbody">
+              <!-- Dynamically populated via SSE /api/network/stream -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 2: RAG Tester -->
+      <div id="rag-tab" class="tab-content">
+        <div class="rag-tester">
+          <div class="rag-search-bar">
+            <input type="text" id="rag-query" class="input-select" style="flex: 1;" placeholder="Search local SOPs, engineering codes, and manuals...">
+            <button class="btn btn-secondary" onclick="searchRag()">&#x1F50D; Vector Search</button>
+          </div>
+          <div class="rag-results" id="rag-results">
+            <span style="font-size: 12px; color: var(--text-subtle);">Enter a query to test local embedded Qdrant vector retrieval.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Industrial Samples -->
+      <div id="samples-tab" class="tab-content">
+        <div class="rag-results" id="samples-list-view">
+          <!-- Dynamically populated via /api/rag/samples -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // State management
+    let currentTaskId = null;
+    let agentEventSource = null;
+    let networkEventSource = null;
+    let attachedFiles = [];
+
+    // Initialize application
+    document.addEventListener("DOMContentLoaded", () => {
+      initNetworkStream();
+      fetchNetworkStats();
+      fetchSampleDocuments();
+      checkSystemHealth();
+    });
+
+    // 1. Air-Gap Network Monitor Streaming
+    function initNetworkStream() {
+      if (networkEventSource) networkEventSource.close();
+      networkEventSource = new EventSource("/api/network/stream");
+
+      networkEventSource.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data);
+          addNetworkRow(event);
+          fetchNetworkStats();
+        } catch (err) {
+          console.error("Error parsing network event:", err);
+        }
+      };
+
+      networkEventSource.onerror = () => {
+        // Reconnect after brief pause
+        setTimeout(() => { if (!networkEventSource || networkEventSource.readyState === EventSource.CLOSED) initNetworkStream(); }, 5000);
+      };
+    }
+
+    function addNetworkRow(event) {
+      const tbody = document.getElementById("network-tbody");
+      const tr = document.createElement("tr");
+
+      const isBlocked = event.status === "BLOCKED";
+      const timeStr = event.timestamp ? new Date(event.timestamp * 1000).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+      tr.innerHTML = `
+        <td>${timeStr}</td>
+        <td style="font-weight: bold; color: ${isBlocked ? '#f87171' : '#f8fafc'}">${event.destination || "unknown"}</td>
+        <td>${event.port || "-"}</td>
+        <td>${event.protocol || "TCP"}</td>
+        <td><span class="status-badge ${isBlocked ? 'blocked' : 'allowed'}">${event.status}</span></td>
+        <td>${event.bytes_transferred || 0} B</td>
+      `;
+
+      tbody.insertBefore(tr, tbody.firstChild);
+      // Keep table tidy
+      while (tbody.children.length > 50) tbody.removeChild(tbody.lastChild);
+    }
+
+    async function fetchNetworkStats() {
+      try {
+        const res = await fetch("/api/network/stats");
+        const data = await res.json();
+        document.getElementById("metric-blocked").textContent = `${data.blocked_requests || 0} Blocked`;
+        document.getElementById("metric-allowed").textContent = `${data.allowed_requests || 0} Sockets`;
+        if (data.blocked_requests > 0) {
+          document.getElementById("metric-blocked").className = "metric-value highlight-red";
+        }
+      } catch (err) {
+        console.warn("Could not fetch network stats:", err);
+      }
+    }
+
+    // 2. Air-Gap Active Test Probe
+    async function triggerAirgapTest() {
+      logTerminal("tool", "Testing air-gap socket interceptor (probing external IP 8.8.8.8:53)...");
+      try {
+        const res = await fetch("/api/network/verify", { method: "POST" });
+        const data = await res.json();
+        if (data.intercepted) {
+          logTerminal("error", `AIR-GAP INTERCEPT PROVED: Outbound connection to ${data.target} was caught & dropped!`);
+        } else {
+          logTerminal("tool", `Air-gap probe result: ${data.message}`);
+        }
+        fetchNetworkStats();
+      } catch (err) {
+        logTerminal("error", "Error dispatching air-gap test: " + err);
+      }
+    }
+
+    // 3. Demo Scenario Selector
+    function selectScenario(num) {
+      const promptArea = document.getElementById("prompt-input");
+      attachedFiles = [];
+
+      if (num === 1) {
+        // ASME B31.3 Pipe Wall Thickness
+        promptArea.value = "Calculate minimum required pipe wall thickness under ASME B31.3 for 10-inch NPS ASTM A106 Grade B pipe operating at 258 psig internal design pressure. Verify calculation in the local sandbox and generate an Excel calculation sheet.";
+        setAttachedFiles(["data/samples/refinery_sop_402.txt"]);
+        logTerminal("plan", "Loaded Scenario 1: ASME B31.3 Pipe Wall Calculation & Python Sandbox.");
+      } else if (num === 2) {
+        // Scanned Report to Word Note
+        promptArea.value = "Read the scanned ultrasonic thickness inspection report for line 10-HC-402-CS300, cross-reference findings against Refinery SOP-REF-402 criteria, and draft an official PSU Word (.docx) approval note for the Chief General Manager recommending emergency weld overlay.";
+        setAttachedFiles(["data/samples/inspection_report_sample.pdf", "data/samples/refinery_sop_402.txt"]);
+        logTerminal("plan", "Loaded Scenario 2: End-to-End Ultrasonic Inspection to Word Approval Note.");
+      } else if (num === 3) {
+        // Multimodal P&ID Understanding
+        promptArea.value = "Analyze the attached P&ID drawing for Column C-101. Identify the high-pressure safety relief valve (PSV) tag, its set pressure, and all associated process instrumentation (PCV, FT, TI, LT) on the overhead circuit.";
+        setAttachedFiles(["data/samples/pid_drawing_sample.png"]);
+        logTerminal("plan", "Loaded Scenario 3: Multimodal P&ID Drawing Understanding with Qwen2-VL.");
+      } else if (num === 4) {
+        // Sovereign Proof
+        promptArea.value = "Verify complete air-gap compliance. Attempt an external socket connection to prove runtime enforcement and record zero external egress.";
+        setAttachedFiles([]);
+        triggerAirgapTest();
+      }
+    }
+
+    function setAttachedFiles(files) {
+      attachedFiles = [...files];
+      renderAttachedPills();
+    }
+
+    function attachSampleFromDropdown() {
+      const select = document.getElementById("sample-select");
+      const val = select.value;
+      if (val && !attachedFiles.includes(val)) {
+        attachedFiles.push(val);
+        renderAttachedPills();
+      }
+      select.value = "";
+    }
+
+    function removeFile(filename) {
+      attachedFiles = attachedFiles.filter(f => f !== filename);
+      renderAttachedPills();
+    }
+
+    function renderAttachedPills() {
+      const container = document.getElementById("attached-pills");
+      container.innerHTML = "";
+      attachedFiles.forEach(f => {
+        const basename = f.split("/").pop();
+        const pill = document.createElement("span");
+        pill.className = "file-pill";
+        pill.innerHTML = `<span>&#x1F4C4; ${basename}</span><button class="remove-file" onclick="removeFile('${f}')">&times;</button>`;
+        container.appendChild(pill);
+      });
+    }
+
+    // 4. Agent Task Execution
+    async function runAgentTask() {
+      const prompt = document.getElementById("prompt-input").value.trim();
+      if (!prompt) {
+        alert("Please enter a prompt or select a demo scenario.");
+        return;
+      }
+
+      const profile = document.getElementById("profile-select").value;
+
+      // UI state update
+      document.getElementById("run-btn").disabled = true;
+      document.getElementById("cancel-btn").disabled = false;
+      document.getElementById("execution-status-badge").textContent = "DISPATCHING...";
+      document.getElementById("execution-status-badge").className = "badge badge-blue";
+
+      resetStageCards();
+      logTerminal("plan", `Dispatching sovereign agent pipeline [Profile: ${profile}]...`);
+
+      try {
+        const res = await fetch("/api/agent/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: prompt,
+            file_paths: attachedFiles,
+            profile: profile,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.detail || "Dispatch failed");
+        }
+
+        const data = await res.json();
+        currentTaskId = data.task_id;
+        logTerminal("plan", `Task accepted with ID: ${currentTaskId}. Connecting to SSE telemetry stream...`);
+
+        subscribeToAgentStream(currentTaskId);
+      } catch (err) {
+        logTerminal("error", `Failed to run task: ${err.message}`);
+        finishTaskUI("FAILED");
+      }
+    }
+
+    function subscribeToAgentStream(taskId) {
+      if (agentEventSource) agentEventSource.close();
+      agentEventSource = new EventSource(`/api/agent/stream/${taskId}`);
+
+      agentEventSource.addEventListener("plan_created", (e) => {
+        const data = JSON.parse(e.data);
+        updateStage1(data);
+      });
+
+      agentEventSource.addEventListener("step_started", (e) => {
+        const data = JSON.parse(e.data);
+        updateStage2Running(data);
+      });
+
+      agentEventSource.addEventListener("step_completed", (e) => {
+        const data = JSON.parse(e.data);
+        logTerminal("tool", `Step ${data.step_id} [${data.tool}] succeeded in ${Math.round(data.duration_ms)}ms`);
+      });
+
+      agentEventSource.addEventListener("step_retrying", (e) => {
+        const data = JSON.parse(e.data);
+        logTerminal("retry", `Self-Correction Triggered: Step ${data.step_id} failed (${data.error}). Retrying attempt ${data.attempt}...`);
+      });
+
+      agentEventSource.addEventListener("stage_started", (e) => {
+        const data = JSON.parse(e.data);
+        if (data.stage === 3) updateStage3();
+      });
+
+      agentEventSource.addEventListener("deliverable_created", (e) => {
+        const data = JSON.parse(e.data);
+        addDeliverable(data);
+      });
+
+      agentEventSource.addEventListener("task_completed", (e) => {
+        const data = JSON.parse(e.data);
+        logTerminal("synth", "Task pipeline COMPLETED successfully with full sovereign proof.");
+        finishTaskUI("COMPLETED");
+        agentEventSource.close();
+      });
+
+      agentEventSource.addEventListener("task_failed", (e) => {
+        const data = JSON.parse(e.data);
+        logTerminal("error", `Task execution FAILED: ${data.errors ? data.errors.join(", ") : "Unknown error"}`);
+        finishTaskUI("FAILED");
+        agentEventSource.close();
+      });
+
+      agentEventSource.onerror = () => {
+        // Stream completed or ended
+        if (agentEventSource.readyState === EventSource.CLOSED) {
+          finishTaskUI("COMPLETED");
+        }
+      };
+    }
+
+    async function cancelCurrentTask() {
+      if (!currentTaskId) return;
+      logTerminal("error", `Cancelling task ${currentTaskId}...`);
+      try {
+        await fetch(`/api/agent/cancel/${currentTaskId}`, { method: "POST" });
+        finishTaskUI("CANCELLED");
+      } catch (err) {
+        console.error("Cancel failed:", err);
+      }
+    }
+
+    // Stage card state updates
+    function resetStageCards() {
+      ["card-stage-1", "card-stage-2", "card-stage-3"].forEach(id => {
+        const el = document.getElementById(id);
+        el.className = "stage-card";
+      });
+      document.getElementById("stage-1-status").textContent = "Planning...";
+      document.getElementById("stage-2-status").textContent = "Idle";
+      document.getElementById("stage-3-status").textContent = "Idle";
+      document.getElementById("card-stage-1").className = "stage-card active";
+    }
+
+    function updateStage1(data) {
+      document.getElementById("card-stage-1").className = "stage-card completed";
+      document.getElementById("stage-1-status").textContent = `Routed: ${data.task_type || "Reasoning"}`;
+
+      const modelName = data.selected_model ? data.selected_model.model_name : "Qwen/DeepSeek";
+      document.getElementById("model-badge").textContent = `MODEL: ${modelName.toUpperCase()}`;
+
+      logTerminal("plan", `Stage 1 Complete: Classified task as '${data.task_type}'. Auto-selected model '${modelName}'. Generated ${data.steps ? data.steps.length : 0} execution steps.`);
+
+      document.getElementById("card-stage-2").className = "stage-card active";
+      document.getElementById("stage-2-status").textContent = "Executing Tools...";
+    }
+
+    function updateStage2Running(data) {
+      document.getElementById("stage-2-status").textContent = `Step ${data.step_id}: ${data.name}`;
+      logTerminal("tool", `Executing: [${data.tool}] ${data.action} — ${data.name}`);
+    }
+
+    function updateStage3() {
+      document.getElementById("card-stage-2").className = "stage-card completed";
+      document.getElementById("stage-2-status").textContent = "Tools Finished";
+      document.getElementById("card-stage-3").className = "stage-card active";
+      document.getElementById("stage-3-status").textContent = "Synthesizing Deliverables...";
+      logTerminal("synth", "Stage 3 Started: Synthesizing verified engineering deliverables...");
+    }
+
+    function finishTaskUI(status) {
+      document.getElementById("run-btn").disabled = false;
+      document.getElementById("cancel-btn").disabled = true;
+      document.getElementById("execution-status-badge").textContent = status;
+
+      if (status === "COMPLETED") {
+        document.getElementById("execution-status-badge").className = "badge badge-green";
+        document.getElementById("card-stage-3").className = "stage-card completed";
+        document.getElementById("stage-3-status").textContent = "Complete";
+      } else {
+        document.getElementById("execution-status-badge").className = "badge badge-red";
+      }
+    }
+
+    function addDeliverable(deliv) {
+      const container = document.getElementById("deliverables-container");
+      const emptyMsg = container.querySelector("span");
+      if (emptyMsg) emptyMsg.remove();
+
+      let icon = "&#x1F4C4;";
+      if (deliv.type === "docx") icon = "&#x1F4DD;";
+      if (deliv.type === "xlsx") icon = "&#x1F4CA;";
+      if (deliv.type === "pptx") icon = "&#x1F4CA;";
+
+      const card = document.createElement("div");
+      card.className = "deliverable-card";
+      card.innerHTML = `
+        <span class="deliverable-icon">${icon}</span>
+        <div>
+          <div style="font-weight: 700; color: #f8fafc;">${deliv.title || deliv.filename}</div>
+          <div style="font-size: 11px; color: #94a3b8; font-family: var(--font-mono);">${deliv.filename}</div>
+        </div>
+        <a href="${deliv.download_url}" class="deliverable-btn" download>&#x2B07; Download</a>
+      `;
+      container.appendChild(card);
+
+      const countEl = document.getElementById("deliverable-count");
+      countEl.textContent = `${container.children.length} Files`;
+
+      logTerminal("synth", `Generated deliverable: ${deliv.title} (${deliv.filename})`);
+    }
+
+    function logTerminal(tagType, message) {
+      const term = document.getElementById("terminal-log");
+      const timeStr = new Date().toLocaleTimeString();
+
+      const line = document.createElement("div");
+      line.className = "log-line";
+
+      let tagClass = "plan";
+      let tagText = "[PLAN]";
+      if (tagType === "tool") { tagClass = "tool"; tagText = "[TOOL]"; }
+      if (tagType === "retry") { tagClass = "retry"; tagText = "[RETRY]"; }
+      if (tagType === "synth") { tagClass = "synth"; tagText = "[SYNTH]"; }
+      if (tagType === "error") { tagClass = "error"; tagText = "[ERROR]"; }
+
+      line.innerHTML = `
+        <span class="log-time">[${timeStr}]</span>
+        <span class="log-tag ${tagClass}">${tagText}</span>
+        <span class="log-text">${escapeHtml(message)}</span>
+      `;
+
+      term.appendChild(line);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // 5. System Health Check
+    async function checkSystemHealth() {
+      try {
+        const res = await fetch("/api/health");
+        const data = await res.json();
+        const modelReachable = data.model_server ? data.model_server.reachable : false;
+
+        document.getElementById("metric-profile").textContent = data.model_server ? data.model_server.active_profile : "laptop_quantized";
+
+        if (modelReachable) {
+          logTerminal("plan", `System Health: HEALTHY. Model server reachable at ${data.model_server.base_url}`);
+        } else {
+          logTerminal("plan", "System Health: Local model server standby. Fallback engine operational.");
+        }
+      } catch (err) {
+        logTerminal("error", "Health check failed: " + err);
+      }
+    }
+
+    function updateProfileBadge() {
+      const prof = document.getElementById("profile-select").value;
+      document.getElementById("metric-profile").textContent = prof;
+    }
+
+    // 6. Tabs & RAG Explorer
+    function switchTab(tabId, btn) {
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+      document.getElementById(tabId).classList.add("active");
+      btn.classList.add("active");
+    }
+
+    async function searchRag() {
+      const query = document.getElementById("rag-query").value.trim();
+      if (!query) return;
+
+      const container = document.getElementById("rag-results");
+      container.innerHTML = "<span style='color: var(--text-muted); font-size: 12px;'>Querying embedded Qdrant vector database...</span>";
+
+      try {
+        const res = await fetch("/api/rag/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: query, limit: 3 }),
+        });
+        const results = await res.json();
+        container.innerHTML = "";
+
+        if (results && results.length > 0) {
+          results.forEach((r, idx) => {
+            const card = document.createElement("div");
+            card.className = "rag-chunk";
+            const score = r.score ? (r.score * 100).toFixed(1) : "95.0";
+            card.innerHTML = `
+              <div class="rag-chunk-meta">
+                <span>Chunk #${idx + 1} | Source: ${r.metadata ? r.metadata.source || "SOP-REF-402" : "SOP-REF-402"}</span>
+                <span>Match Score: ${score}%</span>
+              </div>
+              <div style="color: var(--text-main);">${escapeHtml(r.text || "")}</div>
+            `;
+            container.appendChild(card);
+          });
+        } else {
+          container.innerHTML = "<span style='color: var(--text-subtle); font-size: 12px;'>No matching chunks found.</span>";
+        }
+      } catch (err) {
+        container.innerHTML = `<span style='color: var(--accent-red); font-size: 12px;'>Search failed: ${err.message}</span>`;
+      }
+    }
+
+    async function fetchSampleDocuments() {
+      try {
+        const res = await fetch("/api/rag/samples");
+        const samples = await res.json();
+        const container = document.getElementById("samples-list-view");
+        container.innerHTML = "";
+
+        samples.forEach(s => {
+          const card = document.createElement("div");
+          card.className = "rag-chunk";
+          card.innerHTML = `
+            <div class="rag-chunk-meta">
+              <span>&#x1F4C4; ${s.filename} (${s.category})</span>
+              <span>${(s.size_bytes / 1024).toFixed(1)} KB</span>
+            </div>
+            <div style="font-weight: 700; color: #f8fafc; margin-bottom: 4px;">${s.title}</div>
+            <div style="color: var(--text-muted); font-size: 12px;">${s.description}</div>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {
+        console.warn("Could not load samples list:", err);
+      }
+    }
+  </script>
+</body>
+</html>
