@@ -252,3 +252,16 @@ class DeliverableGenerator:
     # Method alias
     generate_pptx_summary_presentation = generate_pptx_briefing
 
+    def generate_script_deliverable(self, code_content: str, filename_prefix: str = "Verified_Calculation") -> str:
+        """Save a verified Python calculation or engineering automation script as a deliverable."""
+        filepath = self._generate_filepath(filename_prefix, ".py")
+        filepath.write_text(code_content, encoding="utf-8")
+        return str(filepath)
+
+    def generate_markdown_report(self, content: str, filename_prefix: str = "Assessment_Report") -> str:
+        """Save a formatted markdown inspection assessment report as a deliverable."""
+        filepath = self._generate_filepath(filename_prefix, ".md")
+        filepath.write_text(content, encoding="utf-8")
+        return str(filepath)
+
+
