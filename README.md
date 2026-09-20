@@ -100,13 +100,19 @@ git clone https://github.com/Dev-Siwach/LSAI.git
 cd LSAI
 git checkout backend
 
-# Install Python dependencies
+# Automated setup (initializes .venv, dependencies, directory hierarchy, and demo datasets):
+./scripts/setup_env.sh
+
+# Or manual install:
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+python3 scripts/seed_demo_data.py --force --verify
 ```
 
 ### 3. Start Local Model Runner
 ```bash
-# Pull quantized models (for laptop_quantized profile)
+# Pull quantized models (for laptop_quantized profile on RTX 4050 6GB VRAM)
 ollama pull deepseek-r1:32b
 ollama pull qwen2.5-coder:32b
 ollama pull qwen2-vl:7b
@@ -114,11 +120,17 @@ ollama pull qwen2-vl:7b
 # Ollama serves automatically on localhost:11434
 ```
 
-### 4. Launch LSAI Backend
+### 4. Launch LSAI Backend & Test Workbench
 ```bash
 # Run FastAPI server via Uvicorn
 uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+Open **`http://127.0.0.1:8000/demo`** in your browser to access the sovereign test workbench with:
+- Live Air-Gap Status Shield & Packet Monitor
+- Dynamic Model Auto-Selector Badge
+- 4 One-Click Demo Scenarios (ASME B31.3 calculation, scanned inspection to Word approval note, multimodal P&ID understanding, live socket intercept probe)
+- Real-time 3-stage agent execution terminal (SSE)
+- 1-click downloads for verified deliverables (.docx, .xlsx, .pptx, .py)
 
 ---
 
@@ -146,8 +158,9 @@ uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
 ### Document RAG & Deliverables
 - `POST /api/rag/upload`: Upload industrial SOPs or manuals and index into embedded Qdrant.
 - `POST /api/rag/search`: Dense vector search across ingested technical documentation.
+- `GET /api/rag/samples`: List pre-loaded industrial sample files (SOP, scanned PDF report, P&ID schematic).
 - `GET /api/deliverables/list`: List generated artifacts.
-- `GET /api/deliverables/download/{filename}`: Secure download of verified deliverables (.docx, .xlsx, .pptx).
+- `GET /api/deliverables/download/{filename}`: Secure download of verified deliverables (.docx, .xlsx, .pptx, .py).
 
 ---
 
@@ -156,15 +169,15 @@ uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
 The project features a comprehensive test suite covering unit, integration, and security edge-case scenarios:
 
 ```bash
-# Run complete test suite
+# Run complete test suite (106 tests)
 pytest -v
-
-# Run with test coverage
-pytest --cov=. -v
 ```
 
-All 90+ tests verify:
+All 106 tests verify:
 - Strict socket air-gap interception and IPv4/IPv6 loopback whitelist validation.
 - Path-traversal resistance across file management and download endpoints.
 - Self-correction retry loop and stage transition integrity.
-- Deliverable artifact formatting and uniqueness.
+- Deliverable artifact formatting (.docx, .xlsx, .pptx, .py) and uniqueness.
+- Pre-loaded industrial sample datasets (SOP, PDF inspection report, P&ID drawing) and data seeder script.
+- Live serving of the air-gapped test workbench web UI.
+- Complete end-to-end execution of all 4 problem statement demo scenarios.
