@@ -948,6 +948,7 @@
       initNetworkStream();
       fetchNetworkStats();
       fetchSampleDocuments();
+      fetchExistingDeliverables();
       checkSystemHealth();
     });
 
@@ -956,7 +957,7 @@
       if (networkEventSource) networkEventSource.close();
       networkEventSource = new EventSource("/api/network/stream");
 
-      networkEventSource.onmessage = (e) => {
+      networkEventSource.addEventListener("network_event", (e) => {
         try {
           const event = JSON.parse(e.data);
           addNetworkRow(event);
@@ -964,7 +965,7 @@
         } catch (err) {
           console.error("Error parsing network event:", err);
         }
-      };
+      });
 
       networkEventSource.onerror = () => {
         // Reconnect after brief pause
@@ -1135,44 +1136,52 @@
       agentEventSource = new EventSource(`/api/agent/stream/${taskId}`);
 
       agentEventSource.addEventListener("plan_created", (e) => {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = raw.data || raw;
         updateStage1(data);
       });
 
       agentEventSource.addEventListener("step_started", (e) => {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = raw.data || raw;
         updateStage2Running(data);
       });
 
       agentEventSource.addEventListener("step_completed", (e) => {
-        const data = JSON.parse(e.data);
-        logTerminal("tool", `Step ${data.step_id} [${data.tool}] succeeded in ${Math.round(data.duration_ms)}ms`);
+        const raw = JSON.parse(e.data);
+        const data = raw.data || raw;
+        logTerminal("tool", `Step ${data.step_id} [${data.tool}] succeeded in ${Math.round(data.duration_ms || 0)}ms`);
       });
 
       agentEventSource.addEventListener("step_retrying", (e) => {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = raw.data || raw;
         logTerminal("retry", `Self-Correction Triggered: Step ${data.step_id} failed (${data.error}). Retrying attempt ${data.attempt}...`);
       });
 
       agentEventSource.addEventListener("stage_started", (e) => {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = raw.data || raw;
         if (data.stage === 3) updateStage3();
       });
 
       agentEventSource.addEventListener("deliverable_created", (e) => {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = raw.data || raw;
         addDeliverable(data);
       });
 
       agentEventSource.addEventListener("task_completed", (e) => {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = raw.data || raw;
         logTerminal("synth", "Task pipeline COMPLETED successfully with full sovereign proof.");
         finishTaskUI("COMPLETED");
         agentEventSource.close();
       });
 
       agentEventSource.addEventListener("task_failed", (e) => {
-        const data = JSON.parse(e.data);
+        const raw = JSON.parse(e.data);
+        const data = raw.data || raw;
         logTerminal("error", `Task execution FAILED: ${data.errors ? data.errors.join(", ") : "Unknown error"}`);
         finishTaskUI("FAILED");
         agentEventSource.close();
@@ -1275,6 +1284,26 @@
       countEl.textContent = `${container.children.length} Files`;
 
       logTerminal("synth", `Generated deliverable: ${deliv.title} (${deliv.filename})`);
+    }
+
+    async function fetchExistingDeliverables() {
+      try {
+        const resp = await fetch("/api/deliverables/list");
+        if (!resp.ok) return;
+        const files = await resp.json();
+        if (files && files.length > 0) {
+          for (const f of files) {
+            addDeliverable({
+              title: f.name || f.filename,
+              filename: f.name || f.filename,
+              type: (f.name || "").split(".").pop() || "file",
+              download_url: `/api/deliverables/download/${encodeURIComponent(f.name || f.filename)}`
+            });
+          }
+        }
+      } catch (err) {
+        console.debug("Could not load existing deliverables:", err);
+      }
     }
 
     function logTerminal(tagType, message) {

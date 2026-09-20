@@ -177,6 +177,39 @@ class TestWorkbenchUI(unittest.TestCase):
             self.assertIn("description", s)
             self.assertIn("size_bytes", s)
 
+    def test_sse_payload_unwrapping(self):
+        """Verify all agent SSE handlers unwrap the envelope payload (raw.data || raw)."""
+        res = self.client.get("/demo")
+        html = res.text
+        # Each agent event handler must use: const raw = JSON.parse(e.data); const data = raw.data || raw;
+        event_names = ["plan_created", "step_started", "step_completed", "step_retrying",
+                       "stage_started", "deliverable_created", "task_completed", "task_failed"]
+        for event_name in event_names:
+            # Find the addEventListener block for this event
+            idx = html.find(f'addEventListener("{event_name}"')
+            self.assertNotEqual(idx, -1, f"Missing addEventListener for {event_name}")
+            # Check that the handler uses raw.data || raw pattern within 200 chars
+            snippet = html[idx:idx + 300]
+            self.assertIn("raw.data || raw", snippet,
+                          f"Event handler '{event_name}' does not unwrap SSE envelope with 'raw.data || raw'")
+
+    def test_network_event_listener(self):
+        """Verify network SSE uses addEventListener('network_event') not onmessage."""
+        res = self.client.get("/demo")
+        html = res.text
+        self.assertIn('addEventListener("network_event"', html,
+                      "Network stream must use addEventListener('network_event')")
+        # Must NOT use onmessage for the network stream
+        self.assertNotIn("networkEventSource.onmessage", html,
+                         "Network stream must not use .onmessage (server sends named events)")
+
+    def test_deliverables_shelf_initial_load(self):
+        """Verify the deliverables shelf loads existing artifacts on page refresh."""
+        res = self.client.get("/demo")
+        html = res.text
+        self.assertIn("fetchExistingDeliverables", html,
+                      "Workbench must call fetchExistingDeliverables on DOMContentLoaded")
+
 
 class TestEndToEndDemoScenarios(unittest.IsolatedAsyncioTestCase):
     """Test all 4 core demonstration scenarios required by Problem Statement ID 26117."""
