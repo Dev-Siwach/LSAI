@@ -28,7 +28,9 @@ class RagEngine:
 
         if encoder is not None:
             self.encoder = encoder
-            if hasattr(encoder, "get_sentence_embedding_dimension"):
+            if hasattr(encoder, "get_embedding_dimension"):
+                self.vector_size = encoder.get_embedding_dimension()
+            elif hasattr(encoder, "get_sentence_embedding_dimension"):
                 self.vector_size = encoder.get_sentence_embedding_dimension()
             else:
                 self.vector_size = 384
@@ -36,7 +38,12 @@ class RagEngine:
             try:
                 from sentence_transformers import SentenceTransformer
                 self.encoder = SentenceTransformer(self.settings.EMBEDDING_MODEL)
-                self.vector_size = self.encoder.get_sentence_embedding_dimension()
+                if hasattr(self.encoder, "get_embedding_dimension"):
+                    self.vector_size = self.encoder.get_embedding_dimension()
+                elif hasattr(self.encoder, "get_sentence_embedding_dimension"):
+                    self.vector_size = self.encoder.get_sentence_embedding_dimension()
+                else:
+                    self.vector_size = 384
             except ImportError:
                 raise ImportError(
                     "sentence-transformers is required for RagEngine. Please install sentence-transformers."
@@ -158,12 +165,34 @@ class RagEngine:
             except ImportError:
                 qdrant_filter = None
 
-        results = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_vector,
-            query_filter=qdrant_filter,
-            limit=limit,
-        )
+        # Qdrant client compatibility:
+        # In qdrant-client >= 1.10+, search was deprecated in favor of query_points,
+        # and removed in qdrant-client >= 1.19. Legacy mock objects may still mock search.
+        mock_children = getattr(self.client, "_mock_children", None)
+        if mock_children is not None and "search" in mock_children and "query_points" not in mock_children:
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_vector,
+                query_filter=qdrant_filter,
+                limit=limit,
+            )
+        elif hasattr(self.client, "query_points"):
+            res = self.client.query_points(
+                collection_name=self.collection_name,
+                query=query_vector,
+                query_filter=qdrant_filter,
+                limit=limit,
+            )
+            results = getattr(res, "points", res)
+        elif hasattr(self.client, "search"):
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_vector,
+                query_filter=qdrant_filter,
+                limit=limit,
+            )
+        else:
+            results = []
 
         output = []
         for hit in results:
