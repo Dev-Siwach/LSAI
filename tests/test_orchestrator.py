@@ -282,12 +282,12 @@ class TestSessionContextAndSSE:
         task_id = await orchestrator.run_task(prompt=prompt, session_id="test-session")
         assert task_id in orchestrator.tasks
 
-        # Wait briefly for background pipeline to complete
-        for _ in range(30):
+        # Wait for background pipeline to complete (allows time for local Ollama inference)
+        for _ in range(80):
             state = orchestrator.get_task_state(task_id)
             if state["status"] in ("COMPLETED", "FAILED"):
                 break
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.5)
 
         final_state = orchestrator.get_task_state(task_id)
         assert final_state["status"] == "COMPLETED"

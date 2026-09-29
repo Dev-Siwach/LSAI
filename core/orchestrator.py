@@ -89,6 +89,7 @@ class TaskState:
     deliverables: List[Dict[str, Any]] = field(default_factory=list)
     synthesis: Optional[str] = None
     errors: List[str] = field(default_factory=list)
+    event_history: List[Dict[str, Any]] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     completed_at: Optional[float] = None
     cancelled: bool = False
@@ -226,6 +227,11 @@ class Orchestrator:
             "timestamp": time.time(),
             "data": data,
         }
+        # Buffer event in task history for replay on late SSE connections
+        state = self.tasks.get(task_id)
+        if state:
+            state.event_history.append(event_payload)
+
         queues = self.subscribers.get(task_id, set())
         for q in list(queues):
             try:
@@ -249,19 +255,38 @@ class Orchestrator:
                 del self.subscribers[task_id]
 
     async def stream_events(self, task_id: str) -> AsyncIterator[Dict[str, Any]]:
-        """Async generator yielding SSE events for task_id."""
+        """Async generator yielding SSE events for task_id, replaying history first."""
         state = self.tasks.get(task_id)
-        if state and state.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
-            yield {
-                "event": f"task_{state.status.value.lower()}",
-                "task_id": task_id,
-                "timestamp": time.time(),
-                "data": state.to_dict(),
-            }
+        if not state:
             return
 
+        # Snapshot history and subscribe atomically before any await
+        history_snapshot = list(state.event_history)
         q = self.subscribe(task_id)
+
         try:
+            # 1. Replay past buffered events in chronological order
+            terminal_seen = False
+            for event in history_snapshot:
+                yield event
+                if event.get("event") in ("task_completed", "task_failed", "task_cancelled"):
+                    terminal_seen = True
+                    break
+
+            if terminal_seen:
+                return
+
+            # If task already reached terminal state but event was not yet in snapshot
+            if state.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+                yield {
+                    "event": f"task_{state.status.value.lower()}",
+                    "task_id": task_id,
+                    "timestamp": time.time(),
+                    "data": state.to_dict(),
+                }
+                return
+
+            # 2. Stream subsequent live events
             while True:
                 event = await q.get()
                 yield event
@@ -608,9 +633,11 @@ class Orchestrator:
             code = params.get("code")
             if not code:
                 # Synthesize python engineering code based on user prompt and attempt
-                code = self._synthesize_sandbox_code(prompt, attempt)
+                code = await self._synthesize_sandbox_code(prompt, attempt)
+                params["code"] = code
 
             exec_res = self.sandbox.execute_code(code)
+            exec_res["code"] = code
             if not exec_res["success"] or exec_res["exit_code"] != 0:
                 err_msg = exec_res.get("stderr") or f"Exit code {exec_res['exit_code']}"
                 raise RuntimeError(f"Sandbox execution failed: {err_msg}")
@@ -675,11 +702,54 @@ class Orchestrator:
 
         return {"status": "executed", "tool": tool, "action": action}
 
-    def _synthesize_sandbox_code(self, prompt: str, attempt: int) -> str:
+    async def _synthesize_sandbox_code(
+        self,
+        prompt: str,
+        attempt: int,
+        model_id: str = "qwen3.8-27b",
+    ) -> str:
         """Construct executable Python code for engineering calculations.
 
-        Includes self-correction heuristics if attempt > 1.
+        Queries the local coding model (e.g. qwen3.8-27b) and falls back
+        gracefully to verified standards calculations if offline/busy.
         """
+        # 1. Dynamic local LLM generation
+        try:
+            sys_prompt = (
+                "You are an industrial engineering calculation agent. "
+                "Write clean, executable Python code that performs the calculations requested in the prompt, "
+                "printing all key parameters, intermediate values, and compliance decisions. "
+                "Provide ONLY executable Python code inside a ```python ``` markdown block. "
+                "Do not include narrative explanations or text outside code fences."
+            )
+            user_msg = f"Task: {prompt}\nAttempt: {attempt}"
+            if attempt > 1:
+                user_msg += "\nPrevious attempt failed. Please fix any syntax or logic errors."
+
+            res = await asyncio.wait_for(
+                self.model_manager.generate_completion(
+                    model_id=model_id,
+                    messages=[
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user_msg},
+                    ],
+                    temperature=0.2,
+                    max_tokens=1024,
+                ),
+                timeout=30.0,
+            )
+            raw = res.get("content", "")
+            match = re.search(r"```(?:python)?\s*([\s\S]*?)```", raw)
+            if match:
+                extracted = match.group(1).strip()
+                if extracted:
+                    logger.info("Successfully synthesized sandbox code using local LLM.")
+                    return extracted
+            elif "def " in raw or "print(" in raw or "import " in raw:
+                return raw.strip()
+        except Exception as e:
+            logger.info(f"Local LLM code synthesis skipped/timed out ({e}); using verified engineering calculation template.")
+
         p_lower = prompt.lower()
 
         # Calculation: ASME B31.3 Pipe Wall Thickness
@@ -752,15 +822,17 @@ class Orchestrator:
                 else:
                     findings_text = "Technical execution completed with execution errors in tool steps. Please review step logs."
 
+                recommendations_text = (
+                    "1. Recommended for formal executive sign-off under PSU Safety Directive 402.\n"
+                    "2. Maintain strict local sovereign record keeping; zero external network egress verified.\n"
+                    "3. Next scheduled inspection cycle: 180 days."
+                )
+
                 docx_data = {
                     "ref_number": ref_no,
                     "subject": f"Technical Assessment & Compliance Verification — {plan.task_type.replace('_', ' ').title()}",
                     "findings": findings_text,
-                    "recommendations": (
-                        "1. Recommended for formal executive sign-off under PSU Safety Directive 402.\n"
-                        "2. Maintain strict local sovereign record keeping; zero external network egress verified.\n"
-                        "3. Next scheduled inspection cycle: 180 days."
-                    ),
+                    "recommendations": recommendations_text,
                     "annexures": "Annexure A: Verified Local Sandbox Output\nAnnexure B: Qdrant Vector Match Citations",
                 }
                 docx_path = self.deliverable_gen.generate_docx_approval_note(docx_data)
@@ -858,7 +930,15 @@ class Orchestrator:
         # 3. Verified Python Calculation Script deliverable
         if any(k in p_lower for k in ["code", "python", "script", "asme", "thickness", "calculation", "sandbox"]):
             try:
-                calc_code = self._synthesize_sandbox_code(prompt, 1)
+                calc_code = None
+                for res in step_results:
+                    if res.get("tool") == "sandbox" and isinstance(res.get("result"), dict) and res["result"].get("code"):
+                        calc_code = res["result"]["code"]
+                        break
+                if not calc_code:
+                    calc_code = await self._synthesize_sandbox_code(
+                        prompt, 1, model_id=plan.selected_model.get("selected_model_id", "qwen3.8-27b")
+                    )
                 script_path = self.deliverable_gen.generate_script_deliverable(calc_code, f"Verified_Calculation_{now_ts % 10000}")
                 deliverables.append({
                     "type": "py",
