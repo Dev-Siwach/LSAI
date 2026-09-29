@@ -6,12 +6,13 @@ real-time SSE event streaming, and live air-gap security verification.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import socket
 from typing import Any, Dict, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from core.network_monitor import SecurityException, network_monitor
@@ -43,15 +44,20 @@ async def get_recent_network_events(limit: int = 100) -> List[Dict[str, Any]]:
 
 
 @router.get("/stream")
-async def stream_network_events():
+async def stream_network_events(request: Request):
     """SSE endpoint broadcasting real-time socket intercept events."""
     q = await network_monitor.subscribe()
 
     async def event_generator():
         try:
             while True:
-                event = await q.get()
-                yield f"event: network_event\ndata: {json.dumps(event)}\n\n"
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=1.0)
+                    yield f"event: network_event\ndata: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
         finally:
             network_monitor.unsubscribe(q)
 

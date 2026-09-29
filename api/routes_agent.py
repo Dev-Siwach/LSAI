@@ -10,7 +10,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -60,20 +60,16 @@ async def run_agent_task(request: AgentRunRequest) -> AgentRunResponse:
 
 
 @router.get("/stream/{task_id}")
-async def stream_agent_events(task_id: str):
+async def stream_agent_events(task_id: str, request: Request):
     """SSE endpoint streaming live agent thought process, tool execution, and deliverables."""
     state = orchestrator.get_task_state(task_id)
     if not state:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
     async def event_generator():
-        curr = orchestrator.get_task_state(task_id)
-        if curr and curr["status"] in ("COMPLETED", "FAILED", "CANCELLED"):
-            event_name = f"task_{curr['status'].lower()}"
-            yield f"event: {event_name}\ndata: {json.dumps(curr)}\n\n"
-            return
-
         async for event in orchestrator.stream_events(task_id):
+            if await request.is_disconnected():
+                break
             event_name = event.get("event", "message")
             data_str = json.dumps(event)
             yield f"event: {event_name}\ndata: {data_str}\n\n"
