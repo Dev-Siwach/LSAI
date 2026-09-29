@@ -7,6 +7,7 @@ latency tracking, and token statistics — all over localhost only.
 import asyncio
 import json
 import logging
+import re
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -42,6 +43,7 @@ class ModelManager:
             "total_completion_tokens": 0,
         }
 
+        self._resolved_cache: Dict[str, str] = {}
         self._client: Optional[httpx.AsyncClient] = None
         self._lock: Optional[asyncio.Lock] = None
 
@@ -90,6 +92,57 @@ class ModelManager:
             logger.debug(f"Failed to list models: {e}")
             return []
 
+    async def resolve_model_id(self, canonical_id: str) -> str:
+        """Resolve a canonical model ID (e.g. 'deepseek-r1:32b') to an installed local model tag."""
+        if not canonical_id:
+            return canonical_id
+
+        if canonical_id in self._resolved_cache:
+            return self._resolved_cache[canonical_id]
+
+        available = await self.list_available_models()
+        if not available:
+            return canonical_id
+
+        # 1. Exact match
+        if canonical_id in available:
+            self._resolved_cache[canonical_id] = canonical_id
+            return canonical_id
+
+        # 2. Match with :latest suffix or case-insensitive
+        if f"{canonical_id}:latest" in available:
+            self._resolved_cache[canonical_id] = f"{canonical_id}:latest"
+            return f"{canonical_id}:latest"
+
+        for m in available:
+            if m.lower() == canonical_id.lower() or m.lower() == f"{canonical_id.lower()}:latest":
+                self._resolved_cache[canonical_id] = m
+                return m
+
+        # 3. Match by token constituents (e.g. 'deepseek-r1:32b' -> 'deepseek', 'r1', '32b')
+        parts = [p.lower() for p in re.split(r'[:\-_.]', canonical_id) if p]
+        for m in available:
+            m_lower = m.lower()
+            if all(p in m_lower for p in parts):
+                logger.info(f"Resolved canonical model '{canonical_id}' to installed tag '{m}'")
+                self._resolved_cache[canonical_id] = m
+                return m
+
+        # 4. Family and size fallback (e.g. 'qwen2-vl', '7b' or 'deepseek', '32b')
+        for m in available:
+            m_lower = m.lower()
+            families = ["deepseek", "qwen2-vl", "qwen3", "qwen2.5", "qwen", "gemma"]
+            matched_family = next((f for f in families if f in canonical_id.lower()), None)
+            if matched_family and matched_family.replace("-", "") in m_lower.replace("-", ""):
+                sizes = ["70b", "32b", "27b", "14b", "8b", "7b", "3b", "2b", "1.5b"]
+                target_size = next((s for s in sizes if s in canonical_id.lower()), None)
+                if not target_size or target_size in m_lower:
+                    logger.info(f"Fuzzy-resolved model '{canonical_id}' to '{m}'")
+                    self._resolved_cache[canonical_id] = m
+                    return m
+
+        return canonical_id
+
     async def generate_completion(
         self,
         model_id: str,
@@ -103,10 +156,11 @@ class ModelManager:
             ModelError: If the server returns an error or is unreachable.
         """
         self.stats["total_requests"] += 1
+        resolved_id = await self.resolve_model_id(model_id)
 
         start_time = time.time()
         payload: Dict[str, Any] = {
-            "model": model_id,
+            "model": resolved_id,
             "messages": messages,
             "temperature": temperature,
         }
@@ -122,7 +176,7 @@ class ModelManager:
                 error_detail = response.text
                 if response.status_code == 404:
                     error_detail = (
-                        f"Model '{model_id}' might not be downloaded or available locally. "
+                        f"Model '{model_id}' (resolved as '{resolved_id}') might not be downloaded or available locally. "
                         f"Try running 'ollama pull {model_id}'. Original error: {response.text}"
                     )
                 raise ModelError(
@@ -188,9 +242,10 @@ class ModelManager:
             ModelError: If connection fails or server returns non-200.
         """
         self.stats["total_requests"] += 1
+        resolved_id = await self.resolve_model_id(model_id)
 
         payload: Dict[str, Any] = {
-            "model": model_id,
+            "model": resolved_id,
             "messages": messages,
             "temperature": temperature,
             "stream": True,
